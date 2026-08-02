@@ -1,0 +1,13 @@
+# 의존성·빌드 산출물 (앱은 codex-mining-tool/ 하위)
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# API 키·토큰은 코드/레포에 두지 않는다. 키는 브라우저 localStorage(codex_api_key)에만.
+.env
+.env.*

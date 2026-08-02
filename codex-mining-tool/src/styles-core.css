@@ -371,3 +371,245 @@
 .inr-suggest-major { color:var(--hard); }
 .inr-suggest-sep { color:var(--hold); font-weight:400; }
 .inr-suggest-reason { font-size:11.5px; color:var(--sub); line-height:1.4; }
+
+/* ============================================================
+   v0.4 조각 6a — 카테고리 저장소 + 목차 개편
+   목차는 순수 지도(기본 접힘·sticky·dot 잎에만·미분류 하단·`+` 없음).
+   [카테고리 설정] 모달로 대·중분류를 사람이 정한다.
+   ============================================================ */
+
+/* 목차 v0.4 */
+.toc-panel { padding:0; overflow:hidden; display:flex; flex-direction:column; }
+.toc-panel-head { padding:14px; display:flex; flex-direction:column; gap:10px; border-bottom:2px solid var(--ink); background:var(--panel); flex:none; }
+.toc-panel-title-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.toc-cat-btn { height:32px; border:2px solid var(--ink); border-radius:5px; background:#fff; font-size:12.5px; font-weight:700; cursor:pointer; }
+.toc-cat-btn:hover { background:var(--ink); color:var(--panel); }
+.toc-dist-wrap { padding:0 14px 12px; display:flex; flex-direction:column; gap:6px; border-bottom:1px dashed var(--hold); background:var(--panel); flex:none; }
+
+.toc-body { flex:1; overflow-y:auto; display:flex; flex-direction:column; background:var(--panel); }
+
+.toc-major { display:flex; flex-direction:column; }
+.toc-major-head { position:sticky; top:0; z-index:2; border:none; border-bottom:2px solid var(--bg); background:var(--panel); color:var(--ink); padding:11px 13px; display:flex; align-items:center; gap:9px; cursor:pointer; text-align:left; font-family:inherit; }
+.toc-major-head:hover { background:rgba(20,23,28,0.05); }
+.toc-major-head.open { background:var(--ink); color:var(--panel); }
+.toc-major-caret { font-family:var(--mono); font-size:11px; opacity:0.8; flex:none; }
+.toc-major-n { font-family:var(--mono); font-size:12px; opacity:0.75; flex:none; }
+.toc-major-name { font-size:14.5px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.toc-blind { font-size:12px; flex:none; }
+.toc-major-count { font-family:var(--mono); font-size:10.5px; opacity:0.8; white-space:nowrap; flex:none; }
+
+.toc-major-body { background:#fff; border-bottom:2px solid var(--bg); display:flex; flex-direction:column; animation:pw-fade 200ms ease-out; }
+@keyframes pw-fade { from { opacity:0; } to { opacity:1; } }
+
+.toc-leaf { border:none; border-top:1px solid var(--bg); background:transparent; padding:9px 13px 9px 34px; display:flex; align-items:center; gap:9px; cursor:pointer; text-align:left; font-family:inherit; }
+.toc-leaf:hover { background:rgba(20,23,28,0.05); }
+.toc-leaf.selected { background:rgba(200,135,31,0.16); }
+.toc-leaf.selected .toc-leaf-name { font-weight:700; }
+.toc-leaf-name { font-size:13px; color:var(--ink); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.toc-major-empty { padding:10px 13px 12px 34px; font-size:12px; color:var(--hold); font-style:italic; background:#fff; border-bottom:2px solid var(--bg); }
+
+.toc-major.uncat .toc-major-head { background:rgba(138,144,134,0.12); color:var(--sub); }
+.toc-major.uncat .toc-major-head.open { background:var(--sub); color:var(--panel); }
+
+/* 카테고리 없음 안내 */
+.toc-empty-cat { padding:18px 14px; display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
+.toc-empty-cat-title { font-size:14px; font-weight:800; }
+.toc-empty-cat-desc { font-size:12.5px; color:var(--sub); line-height:1.55; }
+.toc-empty-cat-btn { height:34px; padding:0 14px; border:2px solid var(--ink); border-radius:5px; background:var(--soft); font-size:12.5px; font-weight:700; cursor:pointer; }
+
+/* [카테고리 설정] 모달 */
+.cs-modal { width:900px; max-width:100%; max-height:calc(100vh - 60px); overflow-y:auto; background:var(--panel); border:2px solid var(--ink); border-radius:6px; padding:24px 26px; display:flex; flex-direction:column; gap:16px; }
+.cs-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.cs-title { margin:0; font-size:24px; font-weight:800; letter-spacing:-0.02em; }
+.cs-sub { display:block; margin-top:4px; font-size:13px; color:var(--sub); }
+.cs-notice { border:2px solid var(--ink); border-radius:5px; background:#fff; padding:13px 15px; font-size:13.5px; line-height:1.6; }
+
+.cs-preset-card { border:2px dashed var(--hold); border-radius:5px; background:rgba(138,144,134,0.12); padding:22px; display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center; }
+.cs-preset-title { font-size:14px; font-weight:800; }
+.cs-preset-desc { font-size:13px; color:var(--sub); max-width:420px; line-height:1.5; }
+.cs-preset-btn { height:38px; padding:0 18px; border:2px solid var(--ink); border-radius:6px; background:var(--soft); font-size:13.5px; font-weight:700; cursor:pointer; }
+.cs-preset-btn:hover { background:var(--ink); color:var(--panel); border-color:var(--ink); }
+.cs-preset-preview { font-family:var(--mono); font-size:11px; color:var(--sub); }
+
+.cs-list-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.cs-list-title { font-size:14px; font-weight:800; }
+.cs-add-major { display:flex; gap:6px; align-items:center; }
+.cs-add-input { padding:5px 10px; font-size:12.5px; width:200px; }
+.cs-add-btn { height:32px; padding:0 12px; border:2px solid var(--ink); border-radius:5px; background:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.cs-add-btn:hover:not(:disabled) { background:var(--ink); color:var(--panel); }
+.cs-add-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+.cs-list { display:flex; flex-direction:column; gap:9px; }
+.cs-card { border:2px solid var(--ink); border-radius:5px; background:#fff; padding:12px 14px; display:flex; flex-direction:column; gap:9px; }
+.cs-card-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cs-n { font-family:var(--mono); font-size:12px; color:var(--sub); flex:none; }
+.cs-name { font-size:15px; font-weight:700; flex:1; min-width:120px; cursor:pointer; padding:2px 4px; border-radius:3px; }
+.cs-name:hover { background:rgba(200,135,31,0.1); }
+.cs-name-edit { flex:1; min-width:120px; padding:5px 8px; font-size:14px; }
+.cs-card-actions { display:flex; gap:5px; flex:none; }
+.cs-action { height:28px; padding:0 10px; border:2px solid var(--hold); border-radius:4px; background:#fff; font-size:11.5px; font-weight:700; color:var(--sub); cursor:pointer; white-space:nowrap; }
+.cs-action:hover:not(:disabled) { border-color:var(--ink); color:var(--ink); }
+.cs-action:disabled { opacity:0.35; cursor:not-allowed; }
+.cs-action.danger { border-color:var(--hard); color:var(--hard); }
+.cs-action.danger:hover { background:var(--hard); color:var(--panel); }
+
+.cs-subs-row { display:flex; flex-wrap:wrap; gap:7px; padding-left:22px; align-items:center; }
+.cs-sub-pill { display:inline-flex; align-items:center; gap:4px; height:28px; padding:0 8px 0 11px; border:2px solid var(--bg); border-radius:14px; background:var(--panel); font-size:12px; font-weight:600; white-space:nowrap; }
+.cs-sub-remove { border:none; background:transparent; color:var(--hold); cursor:pointer; font-size:14px; padding:0 4px; line-height:1; }
+.cs-sub-remove:hover { color:var(--hard); }
+.cs-add-minor { display:inline-flex; }
+.cs-add-minor-input { height:28px; padding:0 10px; font-size:12px; width:130px; border-radius:14px; border-style:dashed; border-color:var(--hold); }
+
+.cs-card-hint { font-size:11.5px; color:var(--hold); font-style:italic; padding-left:22px; }
+
+.cs-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:2px solid var(--ink); padding-top:14px; flex-wrap:wrap; }
+.cs-foot-hint { font-size:12px; color:var(--sub); flex:1; min-width:200px; }
+.cs-save-btn { height:38px; padding:0 18px; border:2px solid var(--ink); border-radius:6px; background:var(--ink); color:var(--panel); font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.cs-save-btn:hover { background:var(--neu); border-color:var(--neu); color:var(--ink); }
+
+/* ============================================================
+   v0.4 조각 6b — 룰 페이지 개편
+   본문 카드들(요약·hold 안내·재검토·관련 판단) + credit 한 줄 + path 이동 폼.
+   판단문·note·kind·summary 편집은 기존 EditableField·KindPicker 재사용.
+   ============================================================ */
+
+/* 상단 액션 (breadcrumb 옆 [카테고리 이동]·[역사]) */
+.rp-top-actions { display:flex; gap:6px; align-items:center; flex:none; }
+.rp-path-btn { border:2px solid var(--hold); background:#fff; color:var(--sub); border-radius:5px; padding:3px 10px; font-family:var(--mono); font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.rp-path-btn:hover { border-color:var(--ink); color:var(--ink); }
+.rp-path-btn.on { background:var(--soft); border-color:var(--soft); color:var(--ink); }
+.rp-breadcrumb-last { color:var(--ink); font-weight:700; }
+
+/* Path 이동 폼 */
+.rp-path-edit { border:2px solid var(--soft); border-radius:5px; background:rgba(200,135,31,0.06); padding:10px 12px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; animation:rp-fold 180ms ease-out; }
+.rp-path-select { height:32px; padding:0 8px; border:2px solid var(--ink); border-radius:4px; background:#fff; font-size:12.5px; font-family:inherit; color:var(--ink); }
+.rp-path-select:disabled { opacity:0.45; cursor:not-allowed; }
+.rp-path-input { height:32px; padding:0 10px; border:2px solid var(--ink); border-radius:4px; background:#fff; font-size:12.5px; font-family:inherit; flex:1; min-width:120px; }
+.rp-path-sep { color:var(--hold); font-weight:700; }
+.rp-path-actions { display:flex; gap:5px; margin-left:auto; }
+.rp-path-cancel { border:2px solid var(--hold); background:#fff; color:var(--sub); border-radius:4px; padding:5px 10px; font-size:12px; font-weight:700; cursor:pointer; }
+.rp-path-save { border:2px solid var(--ink); background:var(--ink); color:var(--panel); border-radius:4px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+.rp-path-save:disabled { opacity:0.45; cursor:not-allowed; }
+.rp-path-save:hover:not(:disabled) { background:var(--neu); border-color:var(--neu); color:var(--ink); }
+
+/* Credit 한 줄 */
+.rp-credit { font-size:12.5px; color:var(--sub); line-height:1.55; margin-top:-4px; }
+
+/* 요약 카드 */
+.rp-summary-card { border:2px solid var(--ink); border-radius:5px; background:#fff; padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
+.rp-summary-label { font-family:var(--mono); font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--sub); }
+.rp-summary-text { font-size:15px; line-height:1.65; color:var(--ink); }
+.rp-summary-editing { width:100%; font-size:15px; line-height:1.65; border:2px solid var(--soft); border-radius:5px; padding:8px 10px; font-family:inherit; resize:vertical; min-height:80px; }
+
+/* Hold 안내 카드 */
+.rp-hold-card { border:2px dashed var(--hold); border-radius:5px; background:rgba(138,144,134,0.14); padding:15px 17px; display:flex; flex-direction:column; gap:8px; }
+.rp-hold-head { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:800; }
+.rp-hold-body { font-size:13.5px; line-height:1.6; color:var(--sub); }
+.rp-hold-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:2px; }
+
+/* 재검토 카드 */
+.rp-recheck-card { border:2px solid var(--ink); border-radius:5px; background:#fff; padding:14px 16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.rp-recheck-info { display:flex; flex-direction:column; gap:6px; flex:1; min-width:220px; }
+.rp-recheck-label { font-size:14px; font-weight:800; }
+.rp-recheck-triggers { display:flex; flex-direction:column; gap:5px; }
+
+/* Placeholder 버튼 (실동작 없음 · 자리만) */
+.rp-placeholder-btn { height:32px; padding:0 13px; border:2px solid var(--ink); border-radius:5px; background:#fff; font-size:12.5px; font-weight:700; cursor:not-allowed; color:var(--ink); opacity:0.6; }
+.rp-placeholder-btn.primary { background:var(--soft); color:var(--ink); }
+
+/* 관련 판단 pills */
+.rp-related { border-top:2px solid var(--ink); padding-top:13px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.rp-related-label { font-size:13px; font-weight:700; flex:none; }
+.rp-related-pills { display:flex; gap:6px; flex-wrap:wrap; }
+.rp-related-pill { height:30px; padding:0 12px; border:2px solid var(--hard); border-radius:5px; background:#fff; color:var(--hard); font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; font-family:inherit; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+.rp-related-pill:hover { background:var(--hard); color:var(--panel); }
+
+/* ============================================================
+   v0.4 조각 6c — [지식 넣기] 상단 nav + 새 룰 폼 (NewRuleForm).
+   상단 좌측 액션 그룹은 [판단 찾기]·[지식 넣기] 두 탭.
+   ============================================================ */
+
+/* 상단 nav 좌측 액션 (nav-tab 스타일) */
+.topnav-actions { display:flex; gap:6px; margin-left:8px; flex:none; }
+.nav-tab { height:32px; padding:0 14px; border:2px solid #4b534a; border-radius:5px; background:transparent; color:#e9ebe6; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.nav-tab:hover { border-color:#c9cdc6; color:#f5f6f3; }
+.nav-tab.active { background:#f5f6f3; color:var(--ink); border-color:#f5f6f3; }
+
+/* 새 룰 폼 (중앙 자리) */
+.rule-page.nrf { padding:22px 26px 28px; }
+.nrf-head { display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:2px solid var(--ink); padding-bottom:12px; }
+.nrf-title { margin:0; font-size:22px; font-weight:800; letter-spacing:-0.01em; }
+.nrf-cancel { height:32px; padding:0 12px; border:2px solid var(--hold); border-radius:5px; background:#fff; color:var(--sub); font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+.nrf-cancel:hover { border-color:var(--ink); color:var(--ink); }
+
+.nrf-empty { padding:40px 20px; display:flex; flex-direction:column; align-items:center; gap:12px; text-align:center; border:2px dashed var(--hold); border-radius:6px; background:rgba(138,144,134,0.08); margin-top:20px; }
+.nrf-empty-title { font-size:18px; font-weight:800; }
+.nrf-empty-desc { font-size:13.5px; color:var(--sub); line-height:1.65; max-width:420px; }
+.nrf-empty-btn { height:38px; padding:0 18px; border:2px solid var(--ink); border-radius:6px; background:var(--soft); font-size:13.5px; font-weight:700; cursor:pointer; }
+
+.nrf-form { display:flex; flex-direction:column; gap:14px; margin-top:6px; }
+.nrf-row { display:flex; flex-direction:column; gap:5px; }
+.nrf-label { font-family:var(--mono); font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:var(--sub); }
+.nrf-path-selects { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.nrf-judgment { width:100%; font-size:16px; font-weight:600; line-height:1.5; border:2px solid var(--ink); border-radius:5px; padding:10px 12px; background:#fff; font-family:inherit; resize:vertical; min-height:70px; }
+.nrf-judgment::placeholder { color:var(--hold); font-weight:400; }
+.nrf-note { width:100%; height:36px; border:2px solid var(--ink); border-radius:5px; padding:0 12px; background:#fff; font-size:13px; font-family:inherit; }
+.nrf-summary { width:100%; border:2px solid var(--ink); border-radius:5px; padding:9px 12px; background:#fff; font-size:14px; font-family:inherit; resize:vertical; min-height:70px; line-height:1.55; }
+.nrf-error { border:2px dashed var(--hard); background:rgba(158,53,36,0.06); color:var(--hard); font-size:12.5px; font-weight:700; padding:8px 12px; border-radius:5px; }
+.nrf-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+.nrf-cancel-btn { height:36px; padding:0 14px; border:2px solid var(--hold); border-radius:5px; background:#fff; color:var(--sub); font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.nrf-cancel-btn:hover { border-color:var(--ink); color:var(--ink); }
+.nrf-save { height:36px; padding:0 18px; border:2px solid var(--ink); border-radius:5px; background:var(--ink); color:var(--panel); font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+.nrf-save:hover:not(:disabled) { background:var(--neu); border-color:var(--neu); color:var(--ink); }
+.nrf-save:disabled { opacity:0.4; cursor:not-allowed; background:var(--hold); border-color:var(--hold); color:var(--panel); }
+
+/* ============================================================
+   v0.4 조각 6d — AI 찾기 채팅 UI 재작성 (CLAUDE.md 7.2)
+   대화 버블 흐름 · 근거 pill · Cody 하단 상주.
+   ============================================================ */
+
+.af-head-v2 { display:flex; flex-direction:column; gap:2px; padding-bottom:8px; border-bottom:2px solid var(--ink); }
+.af-title { font-size:16px; font-weight:800; }
+.af-sub { font-size:12px; color:var(--sub); }
+
+.af-search-input { display:flex; align-items:center; gap:8px; height:36px; border:2px solid var(--ink); border-radius:5px; background:#fff; padding:0 12px; flex:none; }
+.af-search-input:focus-within { border-color:var(--soft); }
+.af-search-inner { flex:1; min-width:0; border:none; outline:none; background:transparent; font-size:13px; color:var(--ink); font-family:inherit; }
+.af-search-inner::placeholder { color:var(--hold); }
+.af-enter-hint { font-family:var(--mono); font-size:12px; color:var(--ink); flex:none; }
+
+.af-messages { flex:1; display:flex; flex-direction:column; gap:11px; overflow-y:auto; padding:2px 2px 4px; min-height:120px; }
+.af-empty-hint { font-size:12.5px; color:var(--sub); line-height:1.6; padding:12px 4px; }
+
+/* 버블 (기본) */
+.af-bubble { border-radius:9px; padding:11px 13px; max-width:100%; display:flex; flex-direction:column; gap:7px; animation:pw-pop 200ms ease-out; }
+@keyframes pw-pop { 0% { transform:translateY(-4px); opacity:0; } 100% { transform:translateY(0); opacity:1; } }
+
+/* 사용자 버블 */
+.af-bubble-user { align-self:flex-end; background:#fff; border:2px solid var(--hold); font-size:13.5px; font-weight:600; line-height:1.5; }
+
+/* AI 버블 */
+.af-bubble-ai { align-self:flex-start; background:var(--bg); border:2px solid var(--ink); font-size:13.5px; line-height:1.55; }
+.af-bubble-ai.error { border-style:dashed; border-color:var(--hard); background:rgba(158,53,36,0.05); color:var(--hard); }
+.af-bubble-text { white-space:pre-wrap; word-break:break-word; }
+
+/* 답 안 hold 배너 */
+.af-hold-inline { display:flex; align-items:center; gap:8px; border:2px dashed var(--hold); background:rgba(138,144,134,0.14); border-radius:5px; padding:7px 10px; font-size:12px; font-weight:700; color:var(--sub); }
+
+/* 답 안 근거 pill */
+.af-basis-inline { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.af-basis-label { font-size:11.5px; color:var(--sub); flex:none; }
+.af-basis-pill { display:inline-flex; align-items:center; gap:6px; height:26px; padding:0 9px; border:2px solid var(--hold); border-radius:13px; background:#fff; cursor:pointer; font-family:inherit; white-space:nowrap; flex:none; max-width:100%; overflow:hidden; }
+.af-basis-pill:hover { background:var(--panel); transform:translateY(-1px); }
+.af-basis-dot { width:8px; height:8px; border-radius:50%; border:1.5px solid var(--ink); flex:none; }
+.af-basis-name { font-size:11.5px; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; }
+.af-basis-credit { font-family:var(--mono); font-size:10px; color:var(--sub); flex:none; }
+
+/* 로딩 버블 */
+.af-loading-bubble { flex-direction:row; align-items:center; gap:8px; color:var(--sub); font-size:12.5px; }
+
+/* 하단 Cody */
+.af-cody-row { display:flex; align-items:flex-end; gap:10px; border-top:2px solid var(--ink); padding-top:12px; flex:none; }
+.af-cody-bubble { flex:1; position:relative; background:var(--bg); border:2px solid var(--ink); border-radius:10px; padding:9px 12px; font-size:12.5px; font-weight:600; line-height:1.5; color:var(--ink); }
+.af-cody-bubble::before { content:""; position:absolute; left:-8px; bottom:11px; width:12px; height:12px; background:var(--bg); border-left:2px solid var(--ink); border-bottom:2px solid var(--ink); transform:rotate(45deg); }

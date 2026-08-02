@@ -1,10 +1,12 @@
-// 채굴 프롬프트. 강도(hard/soft)를 등장 빈도와 절대 뒤섞지 않는 게 핵심이다.
-// 코어(3장 스키마)에 맞춰 각 룰에 path 와 review_trigger 를 부여하게 한다.
-// 주의: 예시 JSON에는 // 주석이나 '정수' 같은 플레이스홀더를 넣지 않는다
-//       — 모델이 그대로 흉내 내면 JSON 파싱이 깨진다. 설명은 본문 산문으로.
+// 프롬프트 모음. v0.4에서 카테고리 제약 도입 (CLAUDE.md 4.6 · 원칙 10·11).
+// - 계약 마이닝·AI path 제안: codex_categories 안에서만 분류. 새 대분류 발명 금지.
+// - 안 맞으면 "미분류"로. 코어(store.enforcePath)가 최종 방어.
+// 주의: 예시 JSON에 // 주석·플레이스홀더 넣지 않는다 — 모델이 흉내 내면 파싱이 깨진다.
 
-export function buildMiningPrompt(signedText, standardText) {
+// v0.4 조각 6e — 계약 마이닝 프롬프트 (categoriesDoc 주입).
+export function buildMiningPrompt(signedText, standardText, categoriesDoc) {
   const standard = standardText && standardText.trim() ? standardText.trim() : "없음";
+  const catBlock = categoriesBlockForPrompt(categoriesDoc);
   return `당신은 기업 법무의 '계약 판단 채굴기'다. 아래 서명된 계약들을 읽고, 이 팀이 반복적으로 내리는 판단을 규칙으로 뽑아낸다. 규칙을 지어내지 말고, 실제 텍스트에서 반복되는 것만 뽑는다.
 
 [강도 판정 — 등장 횟수와 혼동하지 말 것]
@@ -17,8 +19,10 @@ export function buildMiningPrompt(signedText, standardText) {
 - 표준안이 주어지면: 각 조항이 서명본에서 몇 번 관철/양보됐는지 센다.
 - 표준안이 없으면: 반복 등장한 판단과 그 일관성으로 추정하고, 양보 수치는 만들지 마라.
 
+${catBlock}
+
 [각 필드 설명]
-- path: [대분류, 중분류, 항목]. 성격으로 묶는다(예: 정보통제 / 절차·기한 / 책임·분쟁 / 신기술·AI). 같은 성격은 같은 대분류·중분류로 모은다.
+- path: [대분류, 중분류, 항목]. **대·중분류는 반드시 위 [카테고리] 목록에서 고른다** (새 대분류·중분류 발명 금지). 항목(3단)만 판단의 구체 소재로 짧게. 어디에도 안 맞으면 대분류를 "미분류"로 두고 이유를 note에 남긴다.
 - kind: hard | soft | neu | hold 중 하나.
 - strength_label: 마지노선 | 협상 여지 | 신규·미확정 | 사람 확인 중 하나.
 - held / total: 미터용 정수. 표준안이 없으면 등장 횟수/표본 수로. 세지 못하면 둘 다 0.
@@ -33,7 +37,7 @@ export function buildMiningPrompt(signedText, standardText) {
   "rules": [
     {
       "id": "RULE-001",
-      "path": ["책임·분쟁", "배상", "배상 상한"],
+      "path": ["책임·분쟁", "손해배상", "배상 상한"],
       "judgment": "배상 상한은 계약 총액 이내로 묶는다",
       "kind": "hard",
       "strength_label": "마지노선",
@@ -64,8 +68,6 @@ ${standard}`;
 }
 
 // v0.3 조각 4 — AI 찾기 프롬프트 (CLAUDE.md 7.2 · 미탐 우선 · 인용하지 창작 안 함).
-// 트리 룰의 "최소 표현"만 컨텍스트로 넘긴다. review_trigger·history 등은 답에 불필요.
-// 반환은 반드시 JSON: {answer, basis: [{rule_id, why}], verdict: "answered"|"hold"}.
 export function buildAiFindPrompt(question, rules) {
   const minimal = (rules || []).map((r) => ({
     id: r.id,
@@ -106,62 +108,53 @@ ${String(question || "").trim()}
 ${JSON.stringify(minimal, null, 2)}`;
 }
 
-// v0.3 조각 5 — AI path 제안 프롬프트 (CLAUDE.md 4.5 · 3장-10).
-// 기존 트리의 축(대·중분류 + count)만 넘긴다. 개별 판단문은 안 넘겨 토큰 절약.
-// 반환: {suggestions: [{path: [...], reason: "...", is_new_major: bool}, ...]}
-export function buildPathSuggestPrompt(judgment, rules, initialPath = []) {
-  const taxonomy = summarizeTaxonomy(rules);
+// v0.4 조각 6e — AI path 제안 프롬프트 (재작성).
+// v0.3의 rules 인자·is_new_major 필드 제거. codex_categories 안에서만 제안.
+// 반환: {suggestions: [{path, reason}, ...]}
+export function buildPathSuggestPrompt(judgment, categoriesDoc, initialPath = []) {
+  const catBlock = categoriesBlockForPrompt(categoriesDoc);
   const initHint = (initialPath || []).filter(Boolean).join(" > ") || "없음";
   return `당신은 이 팀의 판단 위키 taxonomy 도우미다.
-사용자가 새로 심으려는 판단문을 보고, 기존 트리에 어울리는 path 3개를 제안한다.
+사용자가 새로 심으려는 판단문을 보고, 아래 [카테고리] 안에서 path 3개를 제안한다.
 
 [출력 규칙]
 - JSON만 출력. 마크다운·주석·설명 문장 없음.
-- 정확히 3개의 제안. 각 제안은 path(대분류·중분류·항목 3단 배열) + reason(왜 이 자리인가 한 줄) + is_new_major(bool, 기존에 없는 새 대분류이면 true).
-- 기존 대분류에 잘 맞으면 그 안으로. 안 맞으면 새 대분류를 제안하되 왜 새로 필요한지 이유 필수.
-- 판단의 "성격"으로 묶어라. 문서 종류·계약 종류·거래처로 나누지 마라 — 그건 provenance에 남는다(CLAUDE.md 4.5).
-- initialPath가 주어졌으면 그 시작 경로를 존중하되(예: 대분류 고정) 그 안에서 다양한 위치를 제안.
-- path의 세 번째 단계(항목)는 판단의 구체 소재(예: "배상 상한", "면책 범위") 정도로 짧게.
+- 정확히 3개의 제안. 각 제안은 path(대분류·중분류·항목 3단 배열) + reason(왜 이 자리인가 한 줄).
+- **대·중분류는 반드시 아래 [카테고리]에서 고른다.** 새 대분류·중분류 발명 금지 (원칙 10·11).
+- 항목(path[2])만 판단문의 성격으로 새로 만든다. 짧게(예: "배상 상한", "면책 범위").
+- 어디에도 안 맞으면 대분류 "미분류"로. 이 경우에도 reason에 왜 안 맞는지 한 줄.
+- initialPath가 주어졌으면 그 시작 경로를 존중.
+- 판단의 "성격"으로 묶어라. 문서 종류·계약 종류로 나누지 마라 — 그건 provenance에.
 
 [출력 형식]
 {
   "suggestions": [
-    { "path": ["대분류", "중분류", "항목"], "reason": "...", "is_new_major": false },
-    { "path": ["대분류", "중분류", "항목"], "reason": "...", "is_new_major": false },
-    { "path": ["대분류", "중분류", "항목"], "reason": "...", "is_new_major": true }
+    { "path": ["대분류", "중분류", "항목"], "reason": "..." },
+    { "path": ["대분류", "중분류", "항목"], "reason": "..." },
+    { "path": ["대분류", "중분류", "항목"], "reason": "..." }
   ]
 }
+
+${catBlock}
 
 [새 판단]
 ${String(judgment || "").trim()}
 
 [초기 경로 (있으면 존중)]
-${initHint}
-
-[기존 트리의 축들 (성격으로 묶기 참고용)]
-${taxonomy || "(비어 있음)"}`;
+${initHint}`;
 }
 
-// 트리의 대분류·중분류를 count와 함께 요약. 프롬프트 컨텍스트용.
-// 예: "책임·분쟁 (12) > 배상 (5), 면책 (3), 준거법 (4) | 정보·기밀 (8) > 비밀유지 (5), 개인정보 (3)"
-function summarizeTaxonomy(rules) {
-  if (!Array.isArray(rules) || rules.length === 0) return "";
-  const majors = new Map(); // major → Map(minor → count)
-  for (const r of rules) {
-    const major = r?.path?.[0] || "미분류";
-    const minor = r?.path?.[1] || "";
-    if (!majors.has(major)) majors.set(major, new Map());
-    const minors = majors.get(major);
-    minors.set(minor, (minors.get(minor) || 0) + 1);
+// v0.4 조각 6e — 카테고리 블록 헬퍼 (프롬프트 컨텍스트용).
+// 형식: "- 대분류 (중분류1, 중분류2)" 여러 줄.
+function categoriesBlockForPrompt(doc) {
+  const cats = doc?.categories || [];
+  if (cats.length === 0) {
+    return `[카테고리]
+(설정되지 않음 — 이 경우 대분류를 "미분류"로 통일하라. 코어가 최종 검증한다.)`;
   }
-  const parts = [];
-  for (const [major, minors] of majors) {
-    const majorCount = Array.from(minors.values()).reduce((a, b) => a + b, 0);
-    const minorList = Array.from(minors.entries())
-      .filter(([m]) => m)
-      .map(([m, c]) => `${m} (${c})`)
-      .join(", ");
-    parts.push(`${major} (${majorCount})${minorList ? " > " + minorList : ""}`);
-  }
-  return parts.join(" | ");
+  const lines = cats.map(
+    (c) => `- ${c.name}${c.subs.length ? ` (${c.subs.join(", ")})` : ""}`
+  );
+  return `[카테고리 — v0.4 필수 제약]
+${lines.join("\n")}`;
 }

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Settings from "./components/Settings.jsx";
 import SearchBar from "./components/SearchBar.jsx";
 import WikiShell from "./views/WikiShell.jsx";
 import MoreDrawer from "./views/MoreDrawer.jsx";
+import CategorySetup from "./views/CategorySetup.jsx";
 import { MODEL } from "./api.js";
 import { loadTree, clearTree } from "./core/store.js";
+import { loadCategories, countRulesByMajor } from "./core/categories.js";
 import { downloadWikitreeMd } from "./core/mdExport.js";
 
 // v0.3 앱 셸 (CLAUDE.md 10장).
@@ -15,9 +17,28 @@ export default function App() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(KEY_STORAGE) || "");
   const [showSettings, setShowSettings] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showCategorySetup, setShowCategorySetup] = useState(false);
   const [tree, setTree] = useState(() => loadTree());
+  const [categoriesDoc, setCategoriesDoc] = useState(() => loadCategories());
   const [query, setQuery] = useState("");
-  const [selectedRuleId, setSelectedRuleId] = useState(null);
+  const [selectedRuleId, setSelectedRuleIdRaw] = useState(null);
+  const [newRuleMode, setNewRuleMode] = useState(false);
+
+  // 룰 선택 시 자동으로 새 룰 모드 종료 (사용자 흐름 자연스럽게)
+  const setSelectedRuleId = (id) => {
+    setSelectedRuleIdRaw(id);
+    if (newRuleMode) setNewRuleMode(false);
+  };
+
+  const openNewRule = () => setNewRuleMode(true);
+  const exitNewRule = () => setNewRuleMode(false);
+  const handleSaveNewRule = (newTree, newRule) => {
+    setTree(newTree);
+    if (newRule?.id) setSelectedRuleIdRaw(newRule.id);
+    setNewRuleMode(false);
+  };
+
+  const ruleCounts = useMemo(() => countRulesByMajor(tree), [tree]);
   // v0.3 조각 4: 검색바 엔터 → AI 찾기 승격.
   // aiTrigger는 동일 질문 재실행용 카운터.
   const [aiQuery, setAiQuery] = useState("");
@@ -58,10 +79,35 @@ export default function App() {
           <span className="brand-sub">판단 위키</span>
         </div>
 
+        {/* 상단 좌측 액션 — [판단 찾기] · [지식 넣기] 토글 */}
+        <div className="topnav-actions">
+          <button
+            className={"nav-tab" + (!newRuleMode ? " active" : "")}
+            onClick={exitNewRule}
+            title="위키에서 판단 찾기·읽기·편집"
+          >
+            판단 찾기
+          </button>
+          <button
+            className={"nav-tab" + (newRuleMode ? " active" : "")}
+            onClick={openNewRule}
+            title="새 판단을 룰 페이지에서 등재"
+          >
+            지식 넣기
+          </button>
+        </div>
+
         {/* 검색바 (정문) — 즉시 필터 + 엔터 시 AI 찾기 승격 */}
         <SearchBar query={query} onChange={setQuery} onSubmit={submitAiQuery} />
 
         <div className="topnav-right">
+          <button
+            className="nav-ghost"
+            onClick={() => setShowCategorySetup(true)}
+            title="판단을 분류할 큰 틀"
+          >
+            카테고리 설정
+          </button>
           <button
             className="nav-ghost"
             onClick={() => setShowMore(true)}
@@ -93,15 +139,19 @@ export default function App() {
       {/* 위키 셸 본문 (3판) */}
       <WikiShell
         rules={tree}
-        query={query}
+        categoriesDoc={categoriesDoc}
         selectedRuleId={selectedRuleId}
         onSelectRule={setSelectedRuleId}
+        onOpenCategorySetup={() => setShowCategorySetup(true)}
         onTreeChange={setTree}
         onRequireAuthor={() => setShowSettings(true)}
         apiKey={apiKey}
         aiQuery={aiQuery}
         aiTrigger={aiTrigger}
         onOpenSettings={() => setShowSettings(true)}
+        newRuleMode={newRuleMode}
+        onSaveNewRule={handleSaveNewRule}
+        onCancelNewRule={exitNewRule}
       />
 
       {/* "…더보기" 드로어 — 무거운 편집·렌즈 격리 */}
@@ -114,6 +164,7 @@ export default function App() {
           setShowMore(false);
           setShowSettings(true);
         }}
+        categoriesDoc={categoriesDoc}
       />
 
       {/* 설정 모달 (API 키 + 내 이름) */}
@@ -123,6 +174,18 @@ export default function App() {
         onSave={saveKey}
         onDelete={deleteKey}
         onClose={() => setShowSettings(false)}
+      />
+
+      {/* [카테고리 설정] 모달 — v0.4 조각 6a */}
+      <CategorySetup
+        open={showCategorySetup}
+        onClose={() => setShowCategorySetup(false)}
+        onSaved={(doc) => {
+          setCategoriesDoc(doc);
+          // 카테고리 변경 시 트리 재로드(없어진 카테고리 룰은 다음 저장 때 미분류로).
+          setTree(loadTree());
+        }}
+        ruleCounts={ruleCounts}
       />
     </div>
   );

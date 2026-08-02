@@ -1,20 +1,18 @@
 import { useState } from "react";
-import ManualEntry from "../entries/ManualEntry.jsx";
 import MiningEntry from "../entries/MiningEntry.jsx";
 
-// "…더보기" 드로어 (CLAUDE.md 10.3).
-// 무거운 편집·렌즈는 여기 격리. 인라인·검색·AI 찾기가 정문이고, 이건 유틸.
-// 항목 5개: 수동 폼(실체) · 계약 마이닝(실체) · 검토 추출(준비 중) · 검토 렌즈(준비 중) · 인터뷰(준비 중).
+// "…더보기" 드로어 (CLAUDE.md v0.4 10.9).
+// 무거운 유틸(계약 마이닝·검토 추출·렌즈·인터뷰). 수동 폼은 상단 [지식 넣기]로 흡수됨.
+// 평상시 편집은 룰 페이지 안 EditableField로 (원칙 9).
 const TABS = [
-  { id: "manual", label: "수동 폼", desc: "판단 하나를 신중히", disabled: false },
   { id: "mining", label: "계약 마이닝", desc: "대량 · 초기 부트스트랩용", disabled: false },
-  { id: "review-extract", label: "검토 추출 4단계", desc: "준비 중 — 조각 5", disabled: true },
-  { id: "review-lens", label: "검토 렌즈", desc: "준비 중 — 조각 5", disabled: true },
+  { id: "review-extract", label: "검토 추출 4단계", desc: "준비 중 — 나중 조각", disabled: true },
+  { id: "review-lens", label: "검토 렌즈", desc: "준비 중 — 나중 조각", disabled: true },
   { id: "interview", label: "인터뷰 채굴", desc: "준비 중 — 나중", disabled: true },
 ];
 
-export default function MoreDrawer({ open, onClose, apiKey, onInjected, onOpenSettings }) {
-  const [tab, setTab] = useState("manual");
+export default function MoreDrawer({ open, onClose, apiKey, onInjected, onOpenSettings, categoriesDoc }) {
+  const [tab, setTab] = useState("mining");
   if (!open) return null;
 
   const current = TABS.find((t) => t.id === tab) || TABS[0];
@@ -55,8 +53,6 @@ export default function MoreDrawer({ open, onClose, apiKey, onInjected, onOpenSe
         <div className="more-drawer-body">
           <p className="more-drawer-hint">{current.desc}</p>
 
-          {tab === "manual" && <ManualEntry onInjected={onInjected} />}
-
           {tab === "mining" && (
             <>
               {!apiKey && (
@@ -67,7 +63,11 @@ export default function MoreDrawer({ open, onClose, apiKey, onInjected, onOpenSe
                   </button>
                 </div>
               )}
-              <MiningEntry apiKey={apiKey} onInjected={onInjected} />
+              <MiningEntry
+                apiKey={apiKey}
+                onInjected={onInjected}
+                categoriesDoc={categoriesDoc}
+              />
             </>
           )}
 

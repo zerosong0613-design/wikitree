@@ -5,6 +5,7 @@
 // 코어 코드는 입구/렌즈 추가에도 바뀌지 않는다.
 // ============================================================
 import { normalizeRule, pathKey } from "./schema.js";
+import { enforcePath } from "./categories.js";
 
 export const TREE_KEY = "codex_tree";
 
@@ -68,8 +69,13 @@ function nextUniqueRuleId(tree) {
 }
 
 // 새 룰들을 기존 트리에 병합해 반환한다(저장까지). 순수 병합 로직은 아래 merge().
-export function addRules(incoming) {
-  const merged = merge(loadTree(), incoming);
+// v0.4: categoriesDoc이 넘어오면 path 유효성 검증 → 카테고리 밖이면 "미분류" 강제.
+// (backward compat: 안 넘겨도 동작 — 초기 상태 or 카테고리 미설정 상황.)
+export function addRules(incoming, categoriesDoc = null) {
+  const guarded = categoriesDoc
+    ? (incoming || []).map((r) => ({ ...r, path: enforcePath(r?.path, categoriesDoc) }))
+    : incoming;
+  const merged = merge(loadTree(), guarded);
   saveTree(merged);
   return merged;
 }
@@ -149,17 +155,23 @@ export function setStatus(rules, id, status) {
 }
 
 // v0.3 조각 3: 같은 id 룰을 통째로 교체(경로 병합 아님).
-// - 판단문·note·kind 등 필드 편집용. path/id/created_at은 원본 유지.
+// - 판단문·note·kind 등 필드 편집용. id·created_at은 원본 유지.
 // - 호출자는 반드시 stampAuthoring으로 authors·history를 미리 stamp한 상태로 넘긴다.
 // - 룰이 사라졌으면(경합) 그냥 현재 트리 반환.
-export function updateRule(id, patchedRule) {
+// v0.4: patchedRule의 path가 바뀌었으면 존중(사용자 path 이동). categoriesDoc이 있으면
+//        새 path를 카테고리에 대해 검증(카테고리 밖이면 "미분류"). backward compat: 안 넘겨도 동작.
+export function updateRule(id, patchedRule, categoriesDoc = null) {
   const tree = loadTree();
   const idx = tree.findIndex((r) => r.id === id);
   if (idx === -1) return tree;
   const cur = tree[idx];
+  const nextPath = Array.isArray(patchedRule?.path) && patchedRule.path.length
+    ? patchedRule.path
+    : cur.path;
+  const guardedPath = categoriesDoc ? enforcePath(nextPath, categoriesDoc) : nextPath;
   const out = tree.map((r) => ({ ...r }));
   out[idx] = normalizeRule(
-    { ...patchedRule, id, path: cur.path, created_at: cur.created_at },
+    { ...patchedRule, id, path: guardedPath, created_at: cur.created_at },
     idx
   );
   saveTree(out);

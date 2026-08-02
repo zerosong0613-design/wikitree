@@ -1,20 +1,31 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { KIND_COLOR, KIND_FG, DEFAULT_LABEL } from "../core/schema.js";
 import { updateRule } from "../core/store.js";
 import { stampAuthoring, NoAuthorError } from "../core/authoring.js";
+import { UNCATEGORIZED } from "../core/categories.js";
 import EditableField from "./inline/EditableField.jsx";
 import KindPicker from "./inline/KindPicker.jsx";
 
-// 중앙 룰 페이지 (CLAUDE.md 10.1).
-// ★ 진짜 위키식 표시 — 본문은 "판단 그 자체"(콘텐츠)만 흐른다.
-//    "누가·언제·어디서"(저작·이력·출처)는 본문에 박지 않고 [역사] 토글 뒤로 숨긴다.
-//    (나무위키/위키피디아의 [편집]·역사와 같은 방식. CLAUDE.md 2장은 '기록'을 요구하지
-//     '본문 노출'을 요구하지 않는다 — 기록은 유지, 표시만 역사 뒤로.)
-// ★ v0.3 조각 3 — 판단문·note·kind 마우스오버 인라인 편집. 저장은 조용히(10.5),
-//    이력은 자동으로 [역사]에 쌓인다.
-export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
+// 중앙 룰 페이지 (CLAUDE.md v0.4 10.4).
+// 위→아래: breadcrumb → 판단 → credit → 강도+badge → 요약 카드 → note → hold 안내 → 재검토 → 관련 판단.
+// 편집은 여기서만 (10.8) — 판단문·note·kind·summary·path 모두 마우스오버 편집.
+// 저작·이력·출처는 [역사] 토글 뒤(2장·10.4).
+export default function RulePage({
+  rule,
+  rules,
+  categoriesDoc,
+  onSelectRule,
+  onTreeChange,
+  onRequireAuthor,
+}) {
   const [showHistory, setShowHistory] = useState(false);
   const [kindPickerOpen, setKindPickerOpen] = useState(false);
+  const [pathEditOpen, setPathEditOpen] = useState(false);
+
+  const rulesById = useMemo(
+    () => new Map((rules || []).map((r) => [r.id, r])),
+    [rules]
+  );
 
   if (!rule) {
     return (
@@ -25,7 +36,7 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
             왼쪽 목차에서 룰을 선택하세요.
           </div>
           <div style={{ fontSize: 12.5, color: "var(--hold)", lineHeight: 1.55 }}>
-            아직 룰이 없다면 목차의 <b>+ 새 판단</b> 이나<br />상단 <b>"…더보기"</b>에서 첫 판단을 심어보세요.
+            아직 룰이 없다면 상단 <b>[지식 넣기]</b>에서<br />첫 판단을 심어보세요.
           </div>
         </div>
       </main>
@@ -35,15 +46,14 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
   const color = KIND_COLOR[rule.kind];
   const fg = KIND_FG[rule.kind];
   const isHold = rule.kind === "hold";
-  const historyDesc = [...(rule.history || [])].reverse(); // 최근 위
+  const historyDesc = [...(rule.history || [])].reverse();
   const authorCount = rule.authors?.length || 0;
   const editCount = rule.history?.length || 0;
 
-  // 편집 헬퍼 — 필드 하나를 바꾸고 stampAuthoring 통과, updateRule 저장.
-  // NoAuthorError는 throw해서 EditableField/KindPicker가 catch하도록.
+  // 편집 헬퍼 — patch를 rule에 덮고 stampAuthoring 통과, updateRule 저장.
   function commitPatch(patch, action) {
     const stamped = stampAuthoring({ ...rule, ...patch }, action);
-    const newTree = updateRule(rule.id, stamped);
+    const newTree = updateRule(rule.id, stamped, categoriesDoc);
     onTreeChange && onTreeChange(newTree);
   }
 
@@ -51,70 +61,107 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
     try {
       commitPatch({ judgment: newValue }, "판단문 수정");
     } catch (err) {
-      if (err instanceof NoAuthorError) {
-        onRequireAuthor && onRequireAuthor();
-      }
+      if (err instanceof NoAuthorError) onRequireAuthor && onRequireAuthor();
       throw err;
     }
   }
-
   async function saveNote(newValue) {
     try {
       commitPatch({ note: newValue }, "note 수정");
     } catch (err) {
-      if (err instanceof NoAuthorError) {
-        onRequireAuthor && onRequireAuthor();
-      }
+      if (err instanceof NoAuthorError) onRequireAuthor && onRequireAuthor();
       throw err;
     }
   }
-
+  async function saveSummary(newValue) {
+    try {
+      commitPatch({ summary: newValue }, "summary 수정");
+    } catch (err) {
+      if (err instanceof NoAuthorError) onRequireAuthor && onRequireAuthor();
+      throw err;
+    }
+  }
   function saveKind(newKind) {
     if (newKind === rule.kind) {
       setKindPickerOpen(false);
       return;
     }
     try {
-      commitPatch(
-        { kind: newKind, strength_label: DEFAULT_LABEL[newKind] },
-        "kind 변경"
-      );
+      commitPatch({ kind: newKind, strength_label: DEFAULT_LABEL[newKind] }, "kind 변경");
       setKindPickerOpen(false);
     } catch (err) {
       if (err instanceof NoAuthorError) {
         onRequireAuthor && onRequireAuthor();
         setKindPickerOpen(false);
       } else {
-        // 조용히 무시(콘솔만)
+        console.error(err);
+      }
+    }
+  }
+  function savePath(newPath) {
+    try {
+      commitPatch({ path: newPath }, "path 이동");
+      setPathEditOpen(false);
+    } catch (err) {
+      if (err instanceof NoAuthorError) {
+        onRequireAuthor && onRequireAuthor();
+      } else {
         console.error(err);
       }
     }
   }
 
+  const credit = creditLine(rule);
+  const hasReviewTrigger =
+    (rule.review_trigger?.keywords?.length || 0) > 0 ||
+    !!rule.review_trigger?.test ||
+    !!rule.renew_trigger;
+  const relatedRules = (rule.related || [])
+    .map((id) => rulesById.get(id))
+    .filter(Boolean);
+
   return (
     <main className="rule-page">
-      {/* 상단: breadcrumb(경로) + [역사] 토글 — 나무위키의 [편집]/역사처럼 */}
+      {/* 상단: breadcrumb + 우측 액션 */}
       <div className="rp-top">
         <div className="rp-breadcrumb">
+          <span>판단 찾기</span>
           {rule.path.map((p, i) => (
             <span key={i}>
-              {i > 0 && <span className="rp-breadcrumb-sep"> › </span>}
-              {p}
+              <span className="rp-breadcrumb-sep"> › </span>
+              <span className={i === rule.path.length - 1 ? "rp-breadcrumb-last" : ""}>{p}</span>
             </span>
           ))}
         </div>
-        <button
-          className={"rp-hist-toggle" + (showHistory ? " on" : "")}
-          onClick={() => setShowHistory((v) => !v)}
-          title="이 판단의 저작·편집 이력·출처"
-        >
-          {showHistory ? "역사 닫기" : "[역사]"}
-        </button>
+        <div className="rp-top-actions">
+          <button
+            className={"rp-path-btn" + (pathEditOpen ? " on" : "")}
+            onClick={() => setPathEditOpen((v) => !v)}
+            title="이 판단을 다른 카테고리로"
+          >
+            카테고리 이동
+          </button>
+          <button
+            className={"rp-hist-toggle" + (showHistory ? " on" : "")}
+            onClick={() => setShowHistory((v) => !v)}
+            title="이 판단의 저작·편집 이력·출처"
+          >
+            {showHistory ? "역사 닫기" : "[역사]"}
+          </button>
+        </div>
       </div>
 
-      {/* ── 본문(콘텐츠) — 판단 그 자체만 ── */}
+      {/* Path 이동 폼 (조건부) */}
+      {pathEditOpen && (
+        <PathEditForm
+          value={rule.path}
+          categoriesDoc={categoriesDoc}
+          onSave={savePath}
+          onCancel={() => setPathEditOpen(false)}
+        />
+      )}
 
-      {/* 판단 — 인라인 편집 */}
+      {/* 판단 (제목) */}
       <EditableField
         value={rule.judgment}
         multiline
@@ -125,7 +172,10 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
         onRequireAuthor={onRequireAuthor}
       />
 
-      {/* 강도 + badge + KindPicker 팝오버 */}
+      {/* Credit 한 줄 */}
+      {credit && <div className="rp-credit">{credit}</div>}
+
+      {/* 강도 pill + badge + KindPicker 팝오버 */}
       <div className="rp-strength-row">
         <div className="rp-strength-wrap">
           <button
@@ -156,7 +206,21 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
         {rule.badge ? <span className="rp-badge">{rule.badge}</span> : null}
       </div>
 
-      {/* note — 인라인 편집 (비어도 표시) */}
+      {/* 요약 카드 */}
+      <section className="rp-summary-card">
+        <span className="rp-summary-label">요약</span>
+        <EditableField
+          value={rule.summary}
+          multiline
+          placeholder="여기에 이 판단의 배경·논리를 요약해 두면 나중 검토가 쉬워져요."
+          displayClassName="rp-summary-text"
+          editingClassName="rp-summary-editing"
+          onSave={saveSummary}
+          onRequireAuthor={onRequireAuthor}
+        />
+      </section>
+
+      {/* note (근거·양보 이력 한 줄) */}
       <EditableField
         value={rule.note}
         placeholder="+ 근거·양보 이력 한 줄 (선택)"
@@ -166,46 +230,80 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
         onRequireAuthor={onRequireAuthor}
       />
 
-      {/* hold이면 사각지대 안내 */}
+      {/* hold 안내 카드 (조건부) */}
       {isHold && (
-        <div className="rp-hold-note">
-          팀 판단이 갈린 조항입니다. 이 자리는 <b>사각지대</b>로 남겨져 있어요 —
-          기준이 확정될 때까지 억지로 규칙화하지 않습니다.
+        <div className="rp-hold-card">
+          <div className="rp-hold-head">
+            <span>⚠</span> 팀 판단이 갈린 자리 · 사람 확인 필요
+          </div>
+          <div className="rp-hold-body">
+            {rule.note ||
+              "기준이 확정될 때까지 억지로 규칙화하지 않습니다. 담당자를 정해 한 줄로 확정해야 합니다."}
+          </div>
+          <div className="rp-hold-actions">
+            <button className="rp-placeholder-btn" disabled title="아직 준비 중">
+              토론 열기
+            </button>
+            <button className="rp-placeholder-btn" disabled title="아직 준비 중">
+              담당자 지정
+            </button>
+          </div>
         </div>
       )}
 
-      {/* 재검토 트리거 (콘텐츠 — 이 판단이 언제 걸리는가) */}
-      {(rule.review_trigger?.keywords?.length > 0 ||
-        rule.review_trigger?.test ||
-        rule.renew_trigger) && (
-        <section className="rp-section">
-          <div className="rp-section-label">재검토 트리거</div>
-          {rule.review_trigger?.keywords?.length > 0 && (
-            <div className="rp-triggers">
-              {rule.review_trigger.keywords.map((k, i) => (
-                <span key={i} className="rp-trigger-chip">
-                  {k}
-                </span>
-              ))}
+      {/* 재검토 카드 */}
+      {hasReviewTrigger && (
+        <div className="rp-recheck-card">
+          <div className="rp-recheck-info">
+            <span className="rp-recheck-label">재검토</span>
+            <div className="rp-recheck-triggers">
+              {rule.review_trigger?.keywords?.length > 0 && (
+                <div className="rp-triggers">
+                  {rule.review_trigger.keywords.map((k, i) => (
+                    <span key={i} className="rp-trigger-chip">{k}</span>
+                  ))}
+                </div>
+              )}
+              {rule.review_trigger?.test && (
+                <div className="rp-trigger-test">테스트: {rule.review_trigger.test}</div>
+              )}
+              {rule.renew_trigger && (
+                <div className="rp-trigger-test">RADAR: {rule.renew_trigger}</div>
+              )}
             </div>
-          )}
-          {rule.review_trigger?.test && (
-            <div className="rp-trigger-test">테스트: {rule.review_trigger.test}</div>
-          )}
-          {rule.renew_trigger && (
-            <div className="rp-trigger-test">RADAR: {rule.renew_trigger}</div>
-          )}
-        </section>
+          </div>
+          <button className="rp-placeholder-btn primary" disabled title="아직 준비 중">
+            재검토 요청
+          </button>
+        </div>
       )}
 
-      {/* ── [역사] 뒤 — 누가·언제·어디서 (기본 접힘) ── */}
+      {/* 관련 판단 pills */}
+      {relatedRules.length > 0 && (
+        <div className="rp-related">
+          <span className="rp-related-label">관련 판단</span>
+          <div className="rp-related-pills">
+            {relatedRules.map((r) => (
+              <button
+                key={r.id}
+                className="rp-related-pill"
+                onClick={() => onSelectRule && onSelectRule(r.id)}
+                title={r.path.join(" › ")}
+              >
+                {r.judgment}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* [역사] 뒤 */}
       {showHistory && (
         <div className="rp-history-drawer">
           <div className="rp-history-drawer-head">
             판단 자체가 아니라 <b>이 문서가 어떻게 왔는가</b>입니다 — 저작 {authorCount} · 편집 {editCount}
           </div>
 
-          {/* 저작 (authors) */}
           <section className="rp-section">
             <div className="rp-section-label">저작 · 이 룰의 주인</div>
             {authorCount > 0 ? (
@@ -225,7 +323,6 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
             )}
           </section>
 
-          {/* 이력 (history) — 최근 순 */}
           {historyDesc.length > 0 && (
             <section className="rp-section">
               <div className="rp-section-label">이력 · 편집 기록 (최근 순)</div>
@@ -241,7 +338,6 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
             </section>
           )}
 
-          {/* 출처 (provenance) — 있으면 (검토 추출·계약 마이닝 온 룰만) */}
           {rule.provenance && (
             <section className="rp-section">
               <div className="rp-section-label">출처 · 어디서 왔나</div>
@@ -280,7 +376,6 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
             </section>
           )}
 
-          {/* 메타 */}
           <div className="rp-meta">
             <span className="rp-meta-item">origin: {rule.origin}</span>
             <span className="rp-meta-item">status: {rule.status}</span>
@@ -291,6 +386,110 @@ export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
       )}
     </main>
   );
+}
+
+// ────────────────────────────────────────────
+// 서브 컴포넌트
+// ────────────────────────────────────────────
+
+function PathEditForm({ value, categoriesDoc, onSave, onCancel }) {
+  const cats = categoriesDoc?.categories || [];
+  const [major, setMajor] = useState(value?.[0] || "");
+  const [minor, setMinor] = useState(value?.[1] || "");
+  const [item, setItem] = useState(value?.[2] || "");
+
+  const majorNode = cats.find((c) => c.name === major);
+  const availableMinors = majorNode?.subs || [];
+
+  // 대분류 변경 시 유효하지 않은 중분류는 초기화
+  function onChangeMajor(v) {
+    setMajor(v);
+    const node = cats.find((c) => c.name === v);
+    if (!node || !node.subs.includes(minor)) setMinor("");
+  }
+
+  function submit() {
+    if (!major) return;
+    const newPath = [major, minor, item].map((s) => s.trim()).filter(Boolean);
+    if (newPath.length === 0) return;
+    onSave(newPath);
+  }
+
+  return (
+    <div className="rp-path-edit">
+      <select
+        className="rp-path-select"
+        value={major}
+        onChange={(e) => onChangeMajor(e.target.value)}
+      >
+        <option value="">대분류…</option>
+        {cats.map((c) => (
+          <option key={c.name} value={c.name}>{c.name}</option>
+        ))}
+        <option value={UNCATEGORIZED}>{UNCATEGORIZED}</option>
+      </select>
+      <span className="rp-path-sep">›</span>
+      <select
+        className="rp-path-select"
+        value={minor}
+        onChange={(e) => setMinor(e.target.value)}
+        disabled={!majorNode}
+      >
+        <option value="">(중분류 없음)</option>
+        {availableMinors.map((s) => (
+          <option key={s} value={s}>{s}</option>
+        ))}
+      </select>
+      <span className="rp-path-sep">›</span>
+      <input
+        className="rp-path-input"
+        type="text"
+        placeholder="항목"
+        value={item}
+        onChange={(e) => setItem(e.target.value)}
+      />
+      <div className="rp-path-actions">
+        <button className="rp-path-cancel" onClick={onCancel}>취소</button>
+        <button className="rp-path-save" onClick={submit} disabled={!major}>
+          이동
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Credit 한 줄 합성: "이름가 · 출처에서 · 날짜 (등재|추출)"
+function creditLine(rule) {
+  const author = rule.authors?.[0]?.name || "";
+  const at =
+    rule.provenance?.extracted_at ||
+    rule.authors?.[0]?.at ||
+    rule.created_at ||
+    "";
+  const source = rule.provenance?.source_contract
+    ? `${rule.provenance.source_contract}에서`
+    : originToHuman(rule.origin);
+  const when = at ? fmtDateShort(at) : "";
+  const verb = rule.provenance?.source_contract ? "추출" : "등재";
+  const parts = [];
+  if (author) parts.push(`${author}가`);
+  if (source) parts.push(source);
+  if (when) parts.push(`${when} ${verb}`);
+  return parts.join(" · ");
+}
+
+function originToHuman(o) {
+  const m = {
+    "인라인 편집": "인라인 편집으로",
+    "룰 페이지 편집": "룰 페이지 편집으로",
+    "수동 폼": "수동 폼으로",
+    "새 룰": "새 룰 만들기로",
+    "검토 추출": "검토 추출로",
+    "계약 마이닝(diff)": "계약 마이닝으로",
+    "계약서 마이닝(diff)": "계약 마이닝으로",
+    "인터뷰 채굴": "인터뷰로",
+  };
+  return m[o] || (o ? `${o}으로` : "");
 }
 
 function fmtDate(iso) {
@@ -304,6 +503,17 @@ function fmtDate(iso) {
   const hh = String(d.getHours()).padStart(2, "0");
   const mi = String(d.getMinutes()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+}
+
+function fmtDateShort(iso) {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso;
+  const d = new Date(t);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function MiniMole() {

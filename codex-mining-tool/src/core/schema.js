@@ -114,6 +114,13 @@ export function normalizeRule(r, i = 0) {
     authors,
     history,
     provenance,
+    // v0.4 신규 2필드 (CLAUDE.md 4장 · 조각 6b)
+    // summary: 룰 페이지 요약 카드 본문 (수 줄, 선택). note와 별개 — note는 짧은 근거·양보 이력.
+    // related: 관련 판단 RULE id 배열. 룰 페이지 하단 pills.
+    summary: r?.summary ? String(r.summary) : "",
+    related: Array.isArray(r?.related)
+      ? Array.from(new Set(r.related.map((x) => String(x || "").trim()).filter(Boolean)))
+      : [],
   };
 }
 

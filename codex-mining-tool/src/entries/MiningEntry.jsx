@@ -9,9 +9,9 @@ import { addRules } from "../core/store.js";
 import { stampAuthoring, NoAuthorError, getAuthorName } from "../core/authoring.js";
 
 // 6.4 계약 마이닝 (대량, 초기 부트스트랩용). 코어에 candidate로 주입한다.
-// v0.3: 채굴한 각 룰은 사용자 본인 이름 + role="초안"으로 stamp된다
-//       ("이 사람이 이 마이닝을 돌렸다"는 의미. CLAUDE.md 6.4·2장).
-export default function MiningEntry({ apiKey, onInjected }) {
+// v0.3: 채굴한 각 룰은 사용자 본인 이름 + role="초안"으로 stamp된다.
+// v0.4: 프롬프트에 categoriesDoc 주입 · addRules에도 넘겨 카테고리 밖은 "미분류" 강제.
+export default function MiningEntry({ apiKey, onInjected, categoriesDoc }) {
   const [standardText, setStandardText] = useState("");
   const [signedText, setSignedText] = useState("");
   const [status, setStatus] = useState("idle"); // idle | mining | done | error
@@ -38,14 +38,15 @@ export default function MiningEntry({ apiKey, onInjected }) {
     setStatus("mining");
     setError(null);
     try {
-      const prompt = buildMiningPrompt(signedText, standardText);
+      const prompt = buildMiningPrompt(signedText, standardText, categoriesDoc);
       const raw = await mineRules({ apiKey, prompt });
       const rules = Array.isArray(raw?.rules)
         ? raw.rules.map((r, i) => normalizeRule({ ...r, origin: r.origin || "계약 마이닝(diff)", status: "candidate" }, i))
         : [];
       // v0.3: 채굴 결과 각 룰에 저작자·history 자동 stamp (role="초안").
       const stamped = rules.map((r) => stampAuthoring(r, "계약 마이닝으로 등재"));
-      const tree = addRules(stamped); // 코어에 병합 주입
+      // v0.4: categoriesDoc 넘겨 카테고리 밖 path는 코어가 "미분류"로 강제.
+      const tree = addRules(stamped, categoriesDoc);
       onInjected(tree);
       setAdded(stamped);
       setResult({ rules: stamped, summary: raw?.summary || null });

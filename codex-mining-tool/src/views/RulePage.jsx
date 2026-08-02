@@ -1,13 +1,20 @@
 import { useState } from "react";
-import { KIND_COLOR, KIND_FG } from "../core/schema.js";
+import { KIND_COLOR, KIND_FG, DEFAULT_LABEL } from "../core/schema.js";
+import { updateRule } from "../core/store.js";
+import { stampAuthoring, NoAuthorError } from "../core/authoring.js";
+import EditableField from "./inline/EditableField.jsx";
+import KindPicker from "./inline/KindPicker.jsx";
 
 // 중앙 룰 페이지 (CLAUDE.md 10.1).
 // ★ 진짜 위키식 표시 — 본문은 "판단 그 자체"(콘텐츠)만 흐른다.
 //    "누가·언제·어디서"(저작·이력·출처)는 본문에 박지 않고 [역사] 토글 뒤로 숨긴다.
 //    (나무위키/위키피디아의 [편집]·역사와 같은 방식. CLAUDE.md 2장은 '기록'을 요구하지
 //     '본문 노출'을 요구하지 않는다 — 기록은 유지, 표시만 역사 뒤로.)
-export default function RulePage({ rule }) {
+// ★ v0.3 조각 3 — 판단문·note·kind 마우스오버 인라인 편집. 저장은 조용히(10.5),
+//    이력은 자동으로 [역사]에 쌓인다.
+export default function RulePage({ rule, onTreeChange, onRequireAuthor }) {
   const [showHistory, setShowHistory] = useState(false);
+  const [kindPickerOpen, setKindPickerOpen] = useState(false);
 
   if (!rule) {
     return (
@@ -18,7 +25,7 @@ export default function RulePage({ rule }) {
             왼쪽 목차에서 룰을 선택하세요.
           </div>
           <div style={{ fontSize: 12.5, color: "var(--hold)", lineHeight: 1.55 }}>
-            아직 룰이 없다면 상단 <b>"…더보기"</b>에서<br />첫 판단을 심어보세요.
+            아직 룰이 없다면 목차의 <b>+ 새 판단</b> 이나<br />상단 <b>"…더보기"</b>에서 첫 판단을 심어보세요.
           </div>
         </div>
       </main>
@@ -31,6 +38,58 @@ export default function RulePage({ rule }) {
   const historyDesc = [...(rule.history || [])].reverse(); // 최근 위
   const authorCount = rule.authors?.length || 0;
   const editCount = rule.history?.length || 0;
+
+  // 편집 헬퍼 — 필드 하나를 바꾸고 stampAuthoring 통과, updateRule 저장.
+  // NoAuthorError는 throw해서 EditableField/KindPicker가 catch하도록.
+  function commitPatch(patch, action) {
+    const stamped = stampAuthoring({ ...rule, ...patch }, action);
+    const newTree = updateRule(rule.id, stamped);
+    onTreeChange && onTreeChange(newTree);
+  }
+
+  async function saveJudgment(newValue) {
+    try {
+      commitPatch({ judgment: newValue }, "판단문 수정");
+    } catch (err) {
+      if (err instanceof NoAuthorError) {
+        onRequireAuthor && onRequireAuthor();
+      }
+      throw err;
+    }
+  }
+
+  async function saveNote(newValue) {
+    try {
+      commitPatch({ note: newValue }, "note 수정");
+    } catch (err) {
+      if (err instanceof NoAuthorError) {
+        onRequireAuthor && onRequireAuthor();
+      }
+      throw err;
+    }
+  }
+
+  function saveKind(newKind) {
+    if (newKind === rule.kind) {
+      setKindPickerOpen(false);
+      return;
+    }
+    try {
+      commitPatch(
+        { kind: newKind, strength_label: DEFAULT_LABEL[newKind] },
+        "kind 변경"
+      );
+      setKindPickerOpen(false);
+    } catch (err) {
+      if (err instanceof NoAuthorError) {
+        onRequireAuthor && onRequireAuthor();
+        setKindPickerOpen(false);
+      } else {
+        // 조용히 무시(콘솔만)
+        console.error(err);
+      }
+    }
+  }
 
   return (
     <main className="rule-page">
@@ -55,26 +114,57 @@ export default function RulePage({ rule }) {
 
       {/* ── 본문(콘텐츠) — 판단 그 자체만 ── */}
 
-      {/* 판단 */}
-      <h1 className="rp-judgment">{rule.judgment}</h1>
+      {/* 판단 — 인라인 편집 */}
+      <EditableField
+        value={rule.judgment}
+        multiline
+        placeholder="판단 한 문장 · 클릭해서 편집"
+        displayClassName="rp-judgment"
+        editingClassName="rp-judgment-editing"
+        onSave={saveJudgment}
+        onRequireAuthor={onRequireAuthor}
+      />
 
-      {/* 강도 + badge */}
+      {/* 강도 + badge + KindPicker 팝오버 */}
       <div className="rp-strength-row">
-        <span
-          className="rp-strength"
-          style={{
-            background: color,
-            color: fg,
-            border: isHold ? "2px dashed " + color : "2px solid " + color,
-          }}
-        >
-          {rule.strength_label}
-        </span>
+        <div className="rp-strength-wrap">
+          <button
+            className="rp-strength"
+            style={{
+              background: color,
+              color: fg,
+              border: isHold ? "2px dashed " + color : "2px solid " + color,
+              cursor: "pointer",
+            }}
+            onClick={() => setKindPickerOpen((v) => !v)}
+            title="클릭해서 강도 변경"
+          >
+            {rule.strength_label} ▾
+          </button>
+          {kindPickerOpen && (
+            <>
+              <div
+                className="rp-kind-popover-backdrop"
+                onClick={() => setKindPickerOpen(false)}
+              />
+              <div className="rp-kind-popover">
+                <KindPicker value={rule.kind} onChange={saveKind} />
+              </div>
+            </>
+          )}
+        </div>
         {rule.badge ? <span className="rp-badge">{rule.badge}</span> : null}
       </div>
 
-      {/* note (근거·양보 이력) */}
-      {rule.note ? <p className="rp-note">{rule.note}</p> : null}
+      {/* note — 인라인 편집 (비어도 표시) */}
+      <EditableField
+        value={rule.note}
+        placeholder="+ 근거·양보 이력 한 줄 (선택)"
+        displayClassName="rp-note"
+        editingClassName="rp-note-editing"
+        onSave={saveNote}
+        onRequireAuthor={onRequireAuthor}
+      />
 
       {/* hold이면 사각지대 안내 */}
       {isHold && (

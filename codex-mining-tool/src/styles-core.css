@@ -253,3 +253,121 @@
 .rp-hist-toggle.on { background:var(--ink); color:var(--panel); border-color:var(--ink); }
 .rp-history-drawer { margin-top:22px; border-top:2px dashed var(--hold); padding-top:16px; display:flex; flex-direction:column; gap:16px; animation:rp-fold 240ms cubic-bezier(.2,.8,.3,1); }
 .rp-history-drawer-head { font-size:12px; line-height:1.5; color:var(--sub); background:rgba(138,144,134,.12); border:1px solid var(--hold); border-radius:5px; padding:8px 11px; }
+
+/* ============================================================
+   v0.3 조각 3 — 인라인 편집
+   목차 + 3자리, InlineNewRule, EditableField, KindPicker 팝오버.
+   저장은 조용히(10.5). 편집 힌트는 은은하게.
+   ============================================================ */
+
+/* 목차 + 버튼 (헤더 · 대분류 · 리프 hover) */
+.toc-add-btn { background:transparent; border:1.5px solid transparent; color:var(--hold); border-radius:4px; padding:2px 8px; font-family:var(--mono); font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.toc-add-btn:hover { border-color:var(--ink); color:var(--ink); background:#fff; }
+.toc-add-btn.header { border-color:var(--hold); color:var(--sub); padding:3px 10px; font-size:11.5px; }
+.toc-add-btn.header:hover { border-color:var(--ink); background:var(--ink); color:var(--panel); }
+.toc-add-btn.leaf { opacity:0; transition:opacity 120ms; margin-left:auto; flex:none; padding:1px 7px; font-size:12px; line-height:1; }
+.toc-leaf:hover .toc-add-btn.leaf { opacity:1; }
+.toc-leaf.selected .toc-add-btn.leaf { opacity:1; color:var(--panel); border-color:transparent; }
+.toc-leaf.selected .toc-add-btn.leaf:hover { border-color:var(--panel); background:transparent; color:var(--panel); }
+.toc-major-row { display:flex; align-items:center; gap:6px; }
+.toc-major-row .toc-major-toggle { flex:1; min-width:0; }
+.toc-inline-slot { margin:6px 0 6px 24px; }
+.toc-inline-slot.leaf-slot { margin-left:36px; }
+
+/* 인라인 새 룰 입력창 */
+.inline-new-rule { background:#fff; border:2px solid var(--ink); border-radius:6px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; box-shadow:0 4px 12px rgba(20,23,28,0.08); animation:rp-fold 180ms ease-out; }
+.inr-path-row { display:flex; align-items:center; gap:5px; }
+.inr-path { padding:5px 8px; font-size:12px; }
+/* .inr-path.auto: 자동 채움 힌트 — 편집은 열려있음 (사람이 override 가능). */
+.inr-path.auto { background:rgba(200,135,31,0.08); border-color:var(--soft); font-weight:700; }
+.inr-path.auto:focus { background:#fff; border-color:var(--ink); }
+.inr-judgment { padding:8px 10px; font-size:14px; font-weight:600; }
+.inr-bottom { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.inr-actions { display:flex; gap:6px; margin-left:auto; }
+.inr-btn { border:2px solid var(--ink); border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; background:#fff; }
+.inr-btn.primary { background:var(--ink); color:var(--panel); }
+.inr-btn.primary:hover { background:var(--neu); border-color:var(--neu); color:var(--ink); }
+.inr-btn.ghost { color:var(--sub); }
+.inr-btn:disabled { opacity:0.4; cursor:not-allowed; }
+.inr-error { font-size:11.5px; color:var(--hard); font-weight:700; }
+
+/* 인라인 새 룰 안의 KindPicker는 살짝 작게 */
+.inr-bottom .kind-pick { gap:4px; }
+.inr-bottom .kind-btn { padding:4px 9px; font-size:11px; }
+
+/* EditableField — 기본 display + hover 힌트 + editing 상태 */
+.editable-field { cursor:text; border-radius:4px; padding:2px 4px; margin:-2px -4px; transition:background 120ms, box-shadow 120ms; }
+.editable-field:hover { background:rgba(200,135,31,0.08); box-shadow:inset 0 -1px 0 rgba(200,135,31,0.35); }
+.editable-field.editing { cursor:auto; background:transparent; box-shadow:none; padding:0; margin:0; }
+.editable-field.empty { color:var(--hold); font-style:normal; }
+.editable-field.empty:hover { color:var(--sub); }
+.ef-placeholder { font-size:13px; color:var(--hold); }
+.ef-error { font-size:11.5px; color:var(--hard); font-weight:700; margin-top:4px; }
+
+/* 룰 페이지 판단문 편집 모드 — 원본 크기 유지 */
+.rp-judgment-editing { width:100%; font-size:24px; font-weight:800; line-height:1.4; letter-spacing:-0.01em; border:2px solid var(--soft); border-radius:5px; padding:8px 10px; font-family:inherit; resize:vertical; min-height:56px; }
+.rp-note-editing { width:100%; font-size:14px; color:var(--ink); border:2px solid var(--soft); border-radius:5px; padding:8px 12px; font-family:inherit; }
+
+/* 룰 페이지 강도 pill → KindPicker 팝오버 */
+.rp-strength-wrap { position:relative; display:inline-block; }
+.rp-kind-popover-backdrop { position:fixed; inset:0; z-index:30; }
+.rp-kind-popover { position:absolute; top:calc(100% + 6px); left:0; z-index:31; background:#fff; border:2px solid var(--ink); border-radius:6px; padding:8px; box-shadow:0 8px 24px rgba(20,23,28,0.18); animation:rp-fold 160ms ease-out; }
+.rp-kind-popover .kind-pick { gap:5px; }
+.rp-kind-popover .kind-btn { padding:5px 10px; font-size:11.5px; }
+
+/* ============================================================
+   v0.3 조각 4 — AI 찾기 상주 (CLAUDE.md 7.2 · 10.1 우측)
+   ============================================================ */
+.ai-find-status { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--sub); border:1px solid var(--hold); border-radius:3px; padding:2px 7px; }
+
+.af-ask { display:flex; flex-direction:column; gap:6px; }
+.af-q { min-height:64px; resize:vertical; font-size:13px; line-height:1.5; }
+.af-send { align-self:flex-end; border:2px solid var(--ink); background:var(--ink); color:var(--panel); border-radius:5px; padding:5px 14px; font-size:12px; font-weight:700; cursor:pointer; }
+.af-send:hover { background:var(--neu); border-color:var(--neu); color:var(--ink); }
+.af-send:disabled { opacity:0.45; cursor:not-allowed; background:var(--hold); border-color:var(--hold); color:var(--panel); }
+
+.af-error { border:2px dashed var(--hard); background:rgba(158,53,36,0.06); border-radius:5px; padding:10px 12px; display:flex; flex-direction:column; gap:6px; }
+.af-error-title { font-size:12.5px; font-weight:800; color:var(--hard); }
+.af-error-msg { font-size:11.5px; color:var(--sub); line-height:1.5; }
+.af-error .link-btn { align-self:flex-start; }
+
+.af-loading { display:flex; align-items:center; gap:8px; color:var(--sub); font-size:12px; padding:12px 0; }
+.af-loading-dot { width:8px; height:8px; border-radius:50%; background:var(--soft); animation:af-pulse 1s infinite alternate; }
+@keyframes af-pulse { from { opacity:0.3; transform:scale(0.8); } to { opacity:1; transform:scale(1.1); } }
+
+.af-result { display:flex; flex-direction:column; gap:10px; }
+.af-hold-banner { background:rgba(138,144,134,0.16); border:2px dashed var(--hold); border-radius:4px; padding:8px 10px; font-size:12px; color:var(--sub); line-height:1.5; }
+.af-answer { background:#fff; border:2px solid var(--ink); border-radius:5px; padding:10px 12px; font-size:13.5px; line-height:1.6; color:var(--ink); white-space:pre-wrap; }
+.af-basis { display:flex; flex-direction:column; gap:6px; }
+.af-basis-label { font-family:var(--mono); font-size:10.5px; letter-spacing:0.14em; color:var(--sub); text-transform:uppercase; }
+.af-basis-card { text-align:left; background:var(--bg); border:2px solid var(--ink); border-radius:5px; padding:8px 10px; display:flex; flex-direction:column; gap:5px; cursor:pointer; font-family:inherit; }
+.af-basis-card:hover { background:#fff; box-shadow:0 2px 8px rgba(20,23,28,0.1); }
+.af-basis-top { display:flex; align-items:center; gap:6px; }
+.af-basis-kind { font-size:10px; font-weight:700; border-width:2px; border-radius:3px; padding:1px 6px; flex:none; }
+.af-basis-path { font-family:var(--mono); font-size:10px; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.af-basis-judgment { font-size:12.5px; font-weight:700; line-height:1.4; }
+.af-basis-why { font-size:11.5px; color:var(--sub); line-height:1.5; }
+.af-basis-authors { font-family:var(--mono); font-size:10.5px; color:var(--hold); }
+
+.af-idle-hint { font-size:11.5px; color:var(--sub); line-height:1.6; padding:8px 0; }
+
+/* ============================================================
+   v0.3 조각 5 — AI path 제안 (CLAUDE.md 4.5)
+   InlineNewRule 안에 얹는 3-카드 제안 UI.
+   ============================================================ */
+.inr-suggest-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.inr-suggest-btn { border:2px solid var(--soft); background:#fff; color:var(--soft); border-radius:5px; padding:5px 12px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.inr-suggest-btn:hover:not(:disabled) { background:var(--soft); color:var(--ink); }
+.inr-suggest-btn:disabled { opacity:0.4; cursor:not-allowed; border-color:var(--hold); color:var(--hold); }
+.inr-suggest-hint { font-size:11px; color:var(--hold); font-style:italic; }
+.inr-suggest-error { font-size:11.5px; color:var(--hard); font-weight:600; padding:4px 8px; border:1.5px dashed var(--hard); border-radius:4px; background:rgba(158,53,36,0.05); }
+
+.inr-suggestions { display:flex; flex-direction:column; gap:5px; padding:6px 0; }
+.inr-suggestions-label { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--sub); text-transform:uppercase; padding-bottom:2px; }
+.inr-suggest-card { text-align:left; background:rgba(200,135,31,0.06); border:1.5px solid var(--soft); border-radius:5px; padding:7px 10px; display:flex; flex-direction:column; gap:3px; cursor:pointer; font-family:inherit; position:relative; }
+.inr-suggest-card:hover { background:rgba(200,135,31,0.14); border-color:var(--ink); }
+.inr-suggest-badge { align-self:flex-start; font-family:var(--mono); font-size:9.5px; letter-spacing:0.12em; color:var(--ink); background:var(--soft); border-radius:3px; padding:1px 6px; font-weight:700; }
+.inr-suggest-path { font-size:13px; font-weight:700; color:var(--ink); }
+.inr-suggest-major { color:var(--hard); }
+.inr-suggest-sep { color:var(--hold); font-weight:400; }
+.inr-suggest-reason { font-size:11.5px; color:var(--sub); line-height:1.4; }

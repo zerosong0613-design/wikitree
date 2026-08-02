@@ -5,9 +5,21 @@ import AiFindPanel from "./AiFindPanel.jsx";
 
 // 위키 셸 (CLAUDE.md 10.1). 앱의 유일한 화면.
 // - 좌 25% 목차 / 중 50% 룰 페이지 / 우 25% AI 찾기 자리
-// - 선택 상태·검색 상태는 여기서 소유
-// - 상단 검색바·"…더보기"·설정은 App.jsx의 상단 바에서 트리거 → App state로 전달
-export default function WikiShell({ rules, query, selectedRuleId, onSelectRule }) {
+// - 선택 상태·검색 상태는 App.jsx가 소유하고 이 곳으로 흐른다
+// - onTreeChange·onRequireAuthor: 조각 3(인라인 편집)에서 아래로 전달
+export default function WikiShell({
+  rules,
+  query,
+  selectedRuleId,
+  onSelectRule,
+  onTreeChange,
+  onRequireAuthor,
+  // 조각 4: AI 찾기
+  apiKey,
+  aiQuery,
+  aiTrigger,
+  onOpenSettings,
+}) {
   // 트리에 룰 있을 때 초기 선택: 첫 hard, 없으면 첫 룰
   const derivedInitial = useMemo(() => {
     if (!rules.length) return null;
@@ -32,12 +44,25 @@ export default function WikiShell({ rules, query, selectedRuleId, onSelectRule }
     <div className="wiki-body">
       <TocPanel
         rules={rules}
-        query={query}
         selectedRuleId={selectedRuleId}
         onSelect={onSelectRule}
+        onTreeChange={onTreeChange}
+        onRequireAuthor={onRequireAuthor}
+        apiKey={apiKey}
       />
-      <RulePage rule={selectedRule} />
-      <AiFindPanel />
+      <RulePage
+        rule={selectedRule}
+        onTreeChange={onTreeChange}
+        onRequireAuthor={onRequireAuthor}
+      />
+      <AiFindPanel
+        apiKey={apiKey}
+        rules={rules}
+        aiQuery={aiQuery}
+        aiTrigger={aiTrigger}
+        onSelectRule={onSelectRule}
+        onOpenSettings={onOpenSettings}
+      />
     </div>
   );
 }

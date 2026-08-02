@@ -107,6 +107,93 @@ export async function mineRules({ apiKey, prompt }) {
   }
 }
 
+// v0.3 조각 4 — AI 찾기 호출 (CLAUDE.md 7.2).
+// mineRules와 동일 패턴. 이름·의도만 다르다. 공용화(callClaude)는 리팩터로 나중.
+// 반환은 프롬프트가 강제하는 형태: {answer, basis: [{rule_id, why}], verdict: "answered"|"hold"}.
+export async function askAi({ apiKey, prompt }) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = j?.error?.message || JSON.stringify(j);
+    } catch {
+      detail = await res.text().catch(() => "");
+    }
+    throw new ApiError(res.status, detail);
+  }
+
+  const data = await res.json();
+  const text = (data.content || [])
+    .filter((b) => b && b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  try {
+    return parseModelJson(text);
+  } catch (e) {
+    if (data.stop_reason === "max_tokens") throw new ParseError(text, true);
+    throw e;
+  }
+}
+
+// v0.3 조각 5 — AI path 제안 호출 (CLAUDE.md 4.5 · 3장-10).
+// askAi와 동일 패턴. 반환: {suggestions: [{path, reason, is_new_major}, ...]}
+export async function suggestPath({ apiKey, prompt }) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 1500, // 3개 짧은 제안이면 충분
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const j = await res.json();
+      detail = j?.error?.message || JSON.stringify(j);
+    } catch {
+      detail = await res.text().catch(() => "");
+    }
+    throw new ApiError(res.status, detail);
+  }
+
+  const data = await res.json();
+  const text = (data.content || [])
+    .filter((b) => b && b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  try {
+    return parseModelJson(text);
+  } catch (e) {
+    if (data.stop_reason === "max_tokens") throw new ParseError(text, true);
+    throw e;
+  }
+}
+
 // 사용자에게 보일 친절한 에러 문구.
 export function friendlyError(err) {
   if (err instanceof ApiError) {

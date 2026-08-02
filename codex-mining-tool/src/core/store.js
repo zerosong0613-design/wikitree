@@ -12,10 +12,31 @@ export function loadTree() {
   try {
     const raw = localStorage.getItem(TREE_KEY);
     const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.map((r, i) => normalizeRule(r, i)) : [];
+    if (!Array.isArray(arr)) return [];
+    const normalized = arr.map((r, i) => normalizeRule(r, i));
+    // 기존에 저장된 트리가 id 중복을 갖고 있으면(v0.3 조각 5 이전 버그) 여기서 재할당.
+    return dedupIds(normalized);
   } catch {
     return [];
   }
+}
+
+// 같은 id를 가진 룰이 있으면 뒤쪽 것을 새 유일 id로 교체한다.
+// 앞쪽(선입) id를 신뢰 — 이력·저작·선택 상태의 앵커.
+function dedupIds(rules) {
+  const seen = new Set();
+  const out = [];
+  for (const r of rules) {
+    if (!r.id || seen.has(r.id)) {
+      const newId = nextUniqueRuleId(out.concat(rules.slice(out.length + 1)));
+      out.push({ ...r, id: newId });
+      seen.add(newId);
+    } else {
+      out.push(r);
+      seen.add(r.id);
+    }
+  }
+  return out;
 }
 
 export function saveTree(rules) {
@@ -29,6 +50,21 @@ export function clearTree() {
 function nowStamp() {
   // 브라우저 런타임 — Date 사용 OK.
   return new Date().toISOString();
+}
+
+// 트리에 아직 쓰이지 않은 RULE-XXXX id를 만든다.
+// 호출자가 실수로 같은 id를 여러 룰에 붙여도(예: normalizeRule을 i=0로 반복 호출)
+// 여기서 유일성을 강제해 트리에 중복 id가 안 생기게 한다.
+function nextUniqueRuleId(tree) {
+  let max = 0;
+  for (const r of tree) {
+    const m = /^RULE-(\d+)$/.exec(r?.id || "");
+    if (m) {
+      const n = parseInt(m[1], 10);
+      if (Number.isFinite(n) && n > max) max = n;
+    }
+  }
+  return `RULE-${String(max + 1).padStart(4, "0")}`;
 }
 
 // 새 룰들을 기존 트리에 병합해 반환한다(저장까지). 순수 병합 로직은 아래 merge().
@@ -73,7 +109,12 @@ export function merge(existing, incoming) {
         provenance: r.provenance || cur.provenance || null,
       };
     } else {
-      out.push({ ...r, created_at: r.created_at || nowStamp() });
+      // 새 엔트리 push 시 id 유일성 강제.
+      // 호출자가 넘긴 id가 이미 트리에 있으면(예: 여러 룰이 normalizeRule i=0으로 미리 정규화돼
+      // 다 RULE-0001로 붙어온 경우) 새 유일 id로 교체.
+      const idTaken = out.some((x) => x.id === r.id);
+      const safeId = idTaken || !r.id ? nextUniqueRuleId(out) : r.id;
+      out.push({ ...r, id: safeId, created_at: r.created_at || nowStamp() });
       index.set(key, out.length - 1);
     }
   }
@@ -103,6 +144,24 @@ function mergeAuthors(a = [], b = []) {
 // 승인/삭제 (선택적 편의 — 코어 스키마 status만 건드림)
 export function setStatus(rules, id, status) {
   const out = rules.map((r) => (r.id === id ? { ...r, status } : r));
+  saveTree(out);
+  return out;
+}
+
+// v0.3 조각 3: 같은 id 룰을 통째로 교체(경로 병합 아님).
+// - 판단문·note·kind 등 필드 편집용. path/id/created_at은 원본 유지.
+// - 호출자는 반드시 stampAuthoring으로 authors·history를 미리 stamp한 상태로 넘긴다.
+// - 룰이 사라졌으면(경합) 그냥 현재 트리 반환.
+export function updateRule(id, patchedRule) {
+  const tree = loadTree();
+  const idx = tree.findIndex((r) => r.id === id);
+  if (idx === -1) return tree;
+  const cur = tree[idx];
+  const out = tree.map((r) => ({ ...r }));
+  out[idx] = normalizeRule(
+    { ...patchedRule, id, path: cur.path, created_at: cur.created_at },
+    idx
+  );
   saveTree(out);
   return out;
 }

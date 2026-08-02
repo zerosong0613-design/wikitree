@@ -18,6 +18,17 @@ export default function App() {
   const [tree, setTree] = useState(() => loadTree());
   const [query, setQuery] = useState("");
   const [selectedRuleId, setSelectedRuleId] = useState(null);
+  // v0.3 조각 4: 검색바 엔터 → AI 찾기 승격.
+  // aiTrigger는 동일 질문 재실행용 카운터.
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiTrigger, setAiTrigger] = useState(0);
+  const submitAiQuery = (q) => {
+    setAiQuery(q);
+    setAiTrigger((t) => t + 1);
+    // 목차 필터는 해제 — 좌측은 전체 트리를 유지, 우측 AI 답 옆에서 트리 맥락을 유지한다.
+    // (질문은 우측 패널 textarea에 그대로 남는다.)
+    setQuery("");
+  };
 
   const saveKey = (k) => {
     localStorage.setItem(KEY_STORAGE, k);
@@ -47,8 +58,8 @@ export default function App() {
           <span className="brand-sub">판단 위키</span>
         </div>
 
-        {/* 검색바 (정문) */}
-        <SearchBar query={query} onChange={setQuery} />
+        {/* 검색바 (정문) — 즉시 필터 + 엔터 시 AI 찾기 승격 */}
+        <SearchBar query={query} onChange={setQuery} onSubmit={submitAiQuery} />
 
         <div className="topnav-right">
           <button
@@ -85,6 +96,12 @@ export default function App() {
         query={query}
         selectedRuleId={selectedRuleId}
         onSelectRule={setSelectedRuleId}
+        onTreeChange={setTree}
+        onRequireAuthor={() => setShowSettings(true)}
+        apiKey={apiKey}
+        aiQuery={aiQuery}
+        aiTrigger={aiTrigger}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       {/* "…더보기" 드로어 — 무거운 편집·렌즈 격리 */}

@@ -23,6 +23,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [selectedRuleId, setSelectedRuleIdRaw] = useState(null);
   const [newRuleMode, setNewRuleMode] = useState(false);
+  const [axis, setAxis] = useState("판단"); // v0.5 조각 7c: 위키 축 토글
 
   // 룰 선택 시 자동으로 새 룰 모드 종료 (사용자 흐름 자연스럽게)
   const setSelectedRuleId = (id) => {
@@ -152,6 +153,8 @@ export default function App() {
         newRuleMode={newRuleMode}
         onSaveNewRule={handleSaveNewRule}
         onCancelNewRule={exitNewRule}
+        axis={axis}
+        onAxisChange={setAxis}
       />
 
       {/* "…더보기" 드로어 — 무거운 편집·렌즈 격리 */}

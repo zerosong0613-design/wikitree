@@ -4,12 +4,12 @@ import { addRules } from "../core/store.js";
 import { stampAuthoring, NoAuthorError } from "../core/authoring.js";
 import { UNCATEGORIZED } from "../core/categories.js";
 import { suggestPath, friendlyError } from "../api.js";
-import { buildPathSuggestPrompt } from "../prompt.js";
+import { buildTagsSuggestPrompt } from "../prompt.js";
 import KindPicker from "./inline/KindPicker.jsx";
 
-// 새 판단 만들기 폼 (CLAUDE.md v0.4 6.2 · 10.7).
-// 상단 nav [지식 넣기] → 룰 페이지 자리에 이 폼이 뜬다.
-// 카테고리(대·중분류)는 codex_categories에서만 선택 — 자유 발명 금지(원칙 11).
+// 새 판단 만들기 폼 (CLAUDE.md v0.5 6.2 · 10.7).
+// v0.5: 판단(path) + 원천·의뢰부서 드롭다운 + 주제 pills + contract_view(원천=계약).
+// AI 축 제안이 4축 모두 제안.
 export default function NewRuleForm({
   categoriesDoc,
   apiKey,
@@ -27,7 +27,17 @@ export default function NewRuleForm({
   const [summary, setSummary] = useState("");
   const [error, setError] = useState("");
 
-  // v0.4 조각 6e — AI path 제안 (카테고리 안에서만)
+  // v0.5 조각 7e — 태그 다축
+  const [origin, setOrigin] = useState("");
+  const [dept, setDept] = useState("");
+  const [topics, setTopics] = useState([]);
+  const [topicDraft, setTopicDraft] = useState("");
+  const [contractType, setContractType] = useState("");
+  const [contractGroup, setContractGroup] = useState("");
+  const [article, setArticle] = useState("");
+  const [articleTitle, setArticleTitle] = useState("");
+
+  // AI 제안
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState(null);
   const [suggestError, setSuggestError] = useState("");
@@ -37,12 +47,13 @@ export default function NewRuleForm({
     if (judgmentRef.current) judgmentRef.current.focus();
   }, []);
 
-  const cats = categoriesDoc?.categories || [];
-  const hasCats = cats.length > 0;
-  const majorNode = cats.find((c) => c.name === major);
+  const 판단 = categoriesDoc?.["판단"] || [];
+  const 원천Cats = categoriesDoc?.["원천"] || [];
+  const 부서Cats = categoriesDoc?.["의뢰부서"] || [];
+  const hasCats = 판단.length > 0;
+  const majorNode = 판단.find((c) => c.name === major);
   const availableMinors = majorNode?.subs || [];
 
-  // 카테고리 없음 → 시작 발판 유도
   if (!hasCats) {
     return (
       <main className="rule-page nrf">
@@ -55,7 +66,7 @@ export default function NewRuleForm({
         <div className="nrf-empty">
           <div className="nrf-empty-title">먼저 카테고리를 정하세요</div>
           <div className="nrf-empty-desc">
-            새 판단을 심으려면 대·중분류 카테고리가 필요합니다.<br />
+            새 판단을 심으려면 판단 축 카테고리가 필요합니다.<br />
             [카테고리 설정]에서 시작 발판을 불러오거나 직접 만들어보세요.
           </div>
           <button className="nrf-empty-btn" onClick={onOpenCategorySetup}>
@@ -68,8 +79,34 @@ export default function NewRuleForm({
 
   function onChangeMajor(v) {
     setMajor(v);
-    const node = cats.find((c) => c.name === v);
+    const node = 판단.find((c) => c.name === v);
     if (!node || !node.subs.includes(minor)) setMinor("");
+  }
+
+  function onChangeOrigin(v) {
+    setOrigin(v);
+    // 원천이 "계약"이 아니게 되면 contract_view 필드도 자동 비움
+    if (v !== "계약") {
+      setContractType("");
+      setContractGroup("");
+      setArticle("");
+      setArticleTitle("");
+    }
+  }
+
+  function addTopic() {
+    const v = topicDraft.trim();
+    if (!v) return;
+    if (topics.includes(v)) {
+      setTopicDraft("");
+      return;
+    }
+    setTopics([...topics, v]);
+    setTopicDraft("");
+  }
+
+  function removeTopic(t) {
+    setTopics(topics.filter((x) => x !== t));
   }
 
   const canSave = major.trim() && judgment.trim();
@@ -89,17 +126,31 @@ export default function NewRuleForm({
     setSuggestions(null);
     try {
       const initialPath = [major, minor, item].filter(Boolean);
-      const prompt = buildPathSuggestPrompt(judgment, categoriesDoc, initialPath);
+      const initialTags = { 원천: origin || null, 의뢰부서: dept || null, 주제: topics };
+      const prompt = buildTagsSuggestPrompt(judgment, categoriesDoc, initialPath, initialTags);
       const raw = await suggestPath({ apiKey, prompt });
       const list = Array.isArray(raw?.suggestions) ? raw.suggestions : [];
-      // 카테고리 안에 있는 대분류만 통과 (안전장치). 미분류도 통과.
-      const validMajors = new Set([UNCATEGORIZED, ...cats.map((c) => c.name)]);
+      const validMajors = new Set([UNCATEGORIZED, ...판단.map((c) => c.name)]);
+      const validOrigins = new Set(원천Cats.map((c) => c.name));
+      const validDepts = new Set(부서Cats.map((c) => c.name));
       const safe = list
         .filter((s) => Array.isArray(s?.path) && s.path.length >= 1)
-        .map((s) => ({
-          path: s.path.map((p) => String(p || "").trim()).filter(Boolean),
-          reason: String(s.reason || "").trim(),
-        }))
+        .map((s) => {
+          const path = s.path.map((p) => String(p || "").trim()).filter(Boolean);
+          const t = s.tags || {};
+          const 원천 = t["원천"] && validOrigins.has(t["원천"]) ? t["원천"] : null;
+          const 의뢰부서 = t["의뢰부서"] && validDepts.has(t["의뢰부서"]) ? t["의뢰부서"] : null;
+          const 주제 = Array.isArray(t["주제"])
+            ? t["주제"].map((x) => String(x || "").trim()).filter(Boolean)
+            : [];
+          const cv = 원천 === "계약" ? s.contract_view || null : null;
+          return {
+            path,
+            tags: { 원천, 의뢰부서, 주제 },
+            contract_view: cv,
+            reason: String(s.reason || "").trim(),
+          };
+        })
         .filter((s) => s.path.length >= 1 && validMajors.has(s.path[0]))
         .slice(0, 3);
       setSuggestions(safe);
@@ -116,6 +167,20 @@ export default function NewRuleForm({
     setMajor(s.path[0] || "");
     setMinor(s.path[1] || "");
     setItem(s.path[2] || "");
+    setOrigin(s.tags?.["원천"] || "");
+    setDept(s.tags?.["의뢰부서"] || "");
+    setTopics(Array.isArray(s.tags?.["주제"]) ? s.tags["주제"] : []);
+    if (s.tags?.["원천"] === "계약" && s.contract_view) {
+      setContractType(s.contract_view.contract_type || "");
+      setContractGroup(s.contract_view.contract_group || "");
+      setArticle(s.contract_view.article || "");
+      setArticleTitle(s.contract_view.article_title || "");
+    } else {
+      setContractType("");
+      setContractGroup("");
+      setArticle("");
+      setArticleTitle("");
+    }
     setSuggestions(null);
   }
 
@@ -123,6 +188,26 @@ export default function NewRuleForm({
     if (!canSave) return;
     setError("");
     const path = [major, minor, item].map((s) => s.trim()).filter(Boolean);
+    const tags = {
+      원천: origin.trim() || null,
+      의뢰부서: dept.trim() || null,
+      주제: topics,
+    };
+    let contract_view = null;
+    if (origin === "계약") {
+      const ct = contractType.trim();
+      const cg = contractGroup.trim();
+      const ar = article.trim();
+      const at = articleTitle.trim();
+      if (ct || cg || ar || at) {
+        contract_view = {
+          contract_type: ct || null,
+          contract_group: cg || null,
+          article: ar || null,
+          article_title: at || null,
+        };
+      }
+    }
     const raw = normalizeRule({
       path,
       judgment: judgment.trim(),
@@ -131,11 +216,12 @@ export default function NewRuleForm({
       summary: summary.trim(),
       origin: "새 룰",
       status: "candidate",
+      tags,
+      contract_view,
     });
     try {
       const stamped = stampAuthoring(raw, "새 룰 등재");
       const newTree = addRules([stamped], categoriesDoc);
-      // 저장된 룰을 찾아 selectedRule로 세팅(merge에 의해 id·path가 살아있는 것)
       const stored =
         newTree.find(
           (r) => r.judgment === stamped.judgment && r.path.join("␟") === stamped.path.join("␟")
@@ -162,7 +248,7 @@ export default function NewRuleForm({
 
       <div className="nrf-form">
         <div className="nrf-row">
-          <label className="nrf-label">카테고리 *</label>
+          <label className="nrf-label">판단 카테고리 *</label>
           <div className="nrf-path-selects">
             <select
               className="rp-path-select"
@@ -170,10 +256,8 @@ export default function NewRuleForm({
               onChange={(e) => onChangeMajor(e.target.value)}
             >
               <option value="">대분류…</option>
-              {cats.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
+              {판단.map((c) => (
+                <option key={c.name} value={c.name}>{c.name}</option>
               ))}
               <option value={UNCATEGORIZED}>{UNCATEGORIZED}</option>
             </select>
@@ -186,9 +270,7 @@ export default function NewRuleForm({
             >
               <option value="">(중분류 없음)</option>
               {availableMinors.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
             <span className="rp-path-sep">›</span>
@@ -214,16 +296,16 @@ export default function NewRuleForm({
           />
         </div>
 
-        {/* v0.4 조각 6e — AI path 제안 (카테고리 안에서만) */}
+        {/* v0.5 조각 7e — AI 축 제안 (4축 전부) */}
         <div className="inr-suggest-row nrf-suggest-row">
           <button
             type="button"
             className="inr-suggest-btn"
             onClick={askSuggest}
             disabled={!canSuggest || suggesting}
-            title={suggestDisabledHint || "AI가 카테고리 안에서 path 3개를 제안"}
+            title={suggestDisabledHint || "AI가 카테고리 안에서 4축(판단·원천·부서·주제)을 제안"}
           >
-            {suggesting ? "제안 중…" : "✨ AI에 path 제안받기"}
+            {suggesting ? "제안 중…" : "✨ AI에 축 제안받기"}
           </button>
           {!canSuggest && suggestDisabledHint && (
             <span className="inr-suggest-hint">{suggestDisabledHint}</span>
@@ -250,6 +332,15 @@ export default function NewRuleForm({
                     </span>
                   ))}
                 </div>
+                {(s.tags?.["원천"] || s.tags?.["의뢰부서"] || s.tags?.["주제"]?.length > 0) && (
+                  <div className="inr-suggest-tags">
+                    {s.tags?.["원천"] && <span className="inr-suggest-tag">원천: {s.tags["원천"]}</span>}
+                    {s.tags?.["의뢰부서"] && <span className="inr-suggest-tag">부서: {s.tags["의뢰부서"]}</span>}
+                    {s.tags?.["주제"]?.length > 0 && (
+                      <span className="inr-suggest-tag">주제: {s.tags["주제"].join(", ")}</span>
+                    )}
+                  </div>
+                )}
                 {s.reason && <div className="inr-suggest-reason">→ {s.reason}</div>}
               </button>
             ))}
@@ -260,6 +351,94 @@ export default function NewRuleForm({
           <label className="nrf-label">강도</label>
           <KindPicker value={kind} onChange={setKind} />
         </div>
+
+        {/* v0.5 신규 — 원천 · 의뢰부서 */}
+        <div className="nrf-row nrf-two-col">
+          <div>
+            <label className="nrf-label">원천</label>
+            <select
+              className="rp-path-select nrf-full"
+              value={origin}
+              onChange={(e) => onChangeOrigin(e.target.value)}
+            >
+              <option value="">(미지정)</option>
+              {원천Cats.map((c) => (
+                <option key={c.name} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="nrf-label">의뢰부서</label>
+            <select
+              className="rp-path-select nrf-full"
+              value={dept}
+              onChange={(e) => setDept(e.target.value)}
+            >
+              <option value="">(미지정)</option>
+              {부서Cats.map((c) => (
+                <option key={c.name} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* 주제 (열린 축) */}
+        <div className="nrf-row">
+          <label className="nrf-label">주제 (자유)</label>
+          <div className="rp-topics">
+            {topics.map((t) => (
+              <span key={t} className="rp-topic-pill">
+                {t}
+                <button className="rp-topic-remove" onClick={() => removeTopic(t)}>×</button>
+              </span>
+            ))}
+            <input
+              className="rp-topic-input"
+              placeholder="+ 주제 (엔터로 추가)"
+              value={topicDraft}
+              onChange={(e) => setTopicDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addTopic();
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* contract_view — 원천=계약일 때만 */}
+        {origin === "계약" && (
+          <div className="nrf-row">
+            <label className="nrf-label">계약 자세 (원천=계약)</label>
+            <div className="nrf-cv-grid">
+              <input
+                className="rp-path-input"
+                placeholder="계약 종류 (예: NDA(국문))"
+                value={contractType}
+                onChange={(e) => setContractType(e.target.value)}
+              />
+              <input
+                className="rp-path-input"
+                placeholder="계약 그룹 (예: 정보보호 계약)"
+                value={contractGroup}
+                onChange={(e) => setContractGroup(e.target.value)}
+              />
+              <input
+                className="rp-path-input"
+                placeholder="조항 (예: 제7조)"
+                value={article}
+                onChange={(e) => setArticle(e.target.value)}
+              />
+              <input
+                className="rp-path-input"
+                placeholder="조항 제목 (예: 손해배상)"
+                value={articleTitle}
+                onChange={(e) => setArticleTitle(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="nrf-row">
           <label className="nrf-label">근거·양보 이력 (선택)</label>

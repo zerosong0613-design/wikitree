@@ -81,6 +81,60 @@ export default function RulePage({
       throw err;
     }
   }
+
+  // v0.5 조각 7d — 태그 편집
+  function saveOrigin(newValue) {
+    try {
+      const nextTags = { ...(rule.tags || {}), 원천: newValue || null };
+      // 원천이 "계약"이 아니게 되면 contract_view 자동 null (스키마도 강제하지만 명시)
+      const patch = { tags: nextTags };
+      if (newValue !== "계약") patch.contract_view = null;
+      commitPatch(patch, "원천 변경");
+    } catch (err) {
+      if (err instanceof NoAuthorError) onRequireAuthor && onRequireAuthor();
+      else console.error(err);
+    }
+  }
+
+  function saveDepartment(newValue) {
+    try {
+      commitPatch(
+        { tags: { ...(rule.tags || {}), 의뢰부서: newValue || null } },
+        "의뢰부서 변경"
+      );
+    } catch (err) {
+      if (err instanceof NoAuthorError) onRequireAuthor && onRequireAuthor();
+      else console.error(err);
+    }
+  }
+
+  function saveTopics(newArray) {
+    try {
+      const dedup = Array.from(
+        new Set(
+          (newArray || [])
+            .map((s) => String(s || "").trim())
+            .filter(Boolean)
+        )
+      );
+      commitPatch(
+        { tags: { ...(rule.tags || {}), 주제: dedup } },
+        "주제 편집"
+      );
+    } catch (err) {
+      if (err instanceof NoAuthorError) onRequireAuthor && onRequireAuthor();
+      else console.error(err);
+    }
+  }
+
+  function saveContractView(next) {
+    try {
+      commitPatch({ contract_view: next }, "contract_view 수정");
+    } catch (err) {
+      if (err instanceof NoAuthorError) onRequireAuthor && onRequireAuthor();
+      else console.error(err);
+    }
+  }
   function saveKind(newKind) {
     if (newKind === rule.kind) {
       setKindPickerOpen(false);
@@ -229,6 +283,23 @@ export default function RulePage({
         onSave={saveNote}
         onRequireAuthor={onRequireAuthor}
       />
+
+      {/* v0.5 조각 7d — 태그 카드 (원천·의뢰부서·주제) */}
+      <TagsCard
+        tags={rule.tags || {}}
+        categoriesDoc={categoriesDoc}
+        onSaveOrigin={saveOrigin}
+        onSaveDepartment={saveDepartment}
+        onSaveTopics={saveTopics}
+      />
+
+      {/* v0.5 조각 7d — contract_view 카드 (원천=계약일 때만) */}
+      {rule.tags?.["원천"] === "계약" && (
+        <ContractViewCard
+          value={rule.contract_view}
+          onSave={saveContractView}
+        />
+      )}
 
       {/* hold 안내 카드 (조건부) */}
       {isHold && (
@@ -391,6 +462,180 @@ export default function RulePage({
 // ────────────────────────────────────────────
 // 서브 컴포넌트
 // ────────────────────────────────────────────
+
+// v0.5 조각 7d — 태그 카드 (원천 · 의뢰부서 드롭다운 + 주제 pills).
+function TagsCard({ tags, categoriesDoc, onSaveOrigin, onSaveDepartment, onSaveTopics }) {
+  const origins = categoriesDoc?.["원천"] || [];
+  const depts = categoriesDoc?.["의뢰부서"] || [];
+  const [topicDraft, setTopicDraft] = useState("");
+
+  function addTopic() {
+    const v = topicDraft.trim();
+    if (!v) return;
+    const cur = tags["주제"] || [];
+    if (cur.includes(v)) {
+      setTopicDraft("");
+      return;
+    }
+    onSaveTopics([...cur, v]);
+    setTopicDraft("");
+  }
+  function removeTopic(t) {
+    onSaveTopics((tags["주제"] || []).filter((x) => x !== t));
+  }
+
+  return (
+    <section className="rp-tags-card">
+      <span className="rp-section-label">태그</span>
+      <div className="rp-tags-row">
+        <div className="rp-tag-cell">
+          <label className="rp-tag-label">원천</label>
+          <select
+            className="rp-tag-select"
+            value={tags["원천"] || ""}
+            onChange={(e) => onSaveOrigin(e.target.value)}
+          >
+            <option value="">(미지정)</option>
+            {origins.map((c) => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="rp-tag-cell">
+          <label className="rp-tag-label">의뢰부서</label>
+          <select
+            className="rp-tag-select"
+            value={tags["의뢰부서"] || ""}
+            onChange={(e) => onSaveDepartment(e.target.value)}
+          >
+            <option value="">(미지정)</option>
+            {depts.map((c) => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="rp-topics-row">
+        <label className="rp-tag-label">주제</label>
+        <div className="rp-topics">
+          {(tags["주제"] || []).map((t) => (
+            <span key={t} className="rp-topic-pill">
+              {t}
+              <button
+                className="rp-topic-remove"
+                onClick={() => removeTopic(t)}
+                title="제거"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            className="rp-topic-input"
+            placeholder="+ 주제 (엔터로 추가)"
+            value={topicDraft}
+            onChange={(e) => setTopicDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addTopic();
+              }
+            }}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// v0.5 조각 7d — contract_view 카드 (원천=계약일 때만).
+function ContractViewCard({ value, onSave }) {
+  const cur = value || {};
+  const [editing, setEditing] = useState(false);
+  const [ct, setCt] = useState(cur.contract_type || "");
+  const [cg, setCg] = useState(cur.contract_group || "");
+  const [art, setArt] = useState(cur.article || "");
+  const [at, setAt] = useState(cur.article_title || "");
+
+  function startEdit() {
+    setCt(cur.contract_type || "");
+    setCg(cur.contract_group || "");
+    setArt(cur.article || "");
+    setAt(cur.article_title || "");
+    setEditing(true);
+  }
+  function commit() {
+    const next = {
+      contract_type: ct.trim() || null,
+      contract_group: cg.trim() || null,
+      article: art.trim() || null,
+      article_title: at.trim() || null,
+    };
+    const empty = !next.contract_type && !next.contract_group && !next.article && !next.article_title;
+    onSave(empty ? null : next);
+    setEditing(false);
+  }
+  function cancel() {
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <section className="rp-cv-card editing">
+        <div className="rp-cv-head">
+          <span className="rp-section-label">계약 자세</span>
+          <div className="rp-cv-actions">
+            <button className="rp-path-cancel" onClick={cancel}>취소</button>
+            <button className="rp-path-save" onClick={commit}>저장</button>
+          </div>
+        </div>
+        <div className="rp-cv-grid">
+          <label className="rp-cv-row">
+            <span className="rp-cv-k">계약 종류</span>
+            <input className="rp-path-input" value={ct} onChange={(e) => setCt(e.target.value)} placeholder="예: NDA(국문)" />
+          </label>
+          <label className="rp-cv-row">
+            <span className="rp-cv-k">계약 그룹</span>
+            <input className="rp-path-input" value={cg} onChange={(e) => setCg(e.target.value)} placeholder="예: 정보보호 계약" />
+          </label>
+          <label className="rp-cv-row">
+            <span className="rp-cv-k">조항</span>
+            <input className="rp-path-input" value={art} onChange={(e) => setArt(e.target.value)} placeholder="예: 제7조" />
+          </label>
+          <label className="rp-cv-row">
+            <span className="rp-cv-k">조항 제목</span>
+            <input className="rp-path-input" value={at} onChange={(e) => setAt(e.target.value)} placeholder="예: 위반시 배상" />
+          </label>
+        </div>
+      </section>
+    );
+  }
+
+  const hasAny = cur.contract_type || cur.contract_group || cur.article || cur.article_title;
+  return (
+    <section className="rp-cv-card" onClick={startEdit} title="클릭해서 편집">
+      <div className="rp-cv-head">
+        <span className="rp-section-label">계약 자세</span>
+        <span className="rp-cv-hint">클릭해서 편집</span>
+      </div>
+      {hasAny ? (
+        <div className="rp-cv-grid">
+          {cur.contract_type && (
+            <div className="rp-cv-row"><span className="rp-cv-k">계약 종류</span><span>{cur.contract_type}</span></div>
+          )}
+          {cur.contract_group && (
+            <div className="rp-cv-row"><span className="rp-cv-k">계약 그룹</span><span>{cur.contract_group}</span></div>
+          )}
+          {cur.article && (
+            <div className="rp-cv-row"><span className="rp-cv-k">조항</span><span>{cur.article}{cur.article_title ? ` — ${cur.article_title}` : ""}</span></div>
+          )}
+        </div>
+      ) : (
+        <div className="rp-cv-empty">+ 계약 자세를 채워보세요 (계약종류·조항 등)</div>
+      )}
+    </section>
+  );
+}
 
 function PathEditForm({ value, categoriesDoc, onSave, onCancel }) {
   const cats = categoriesDoc?.categories || [];

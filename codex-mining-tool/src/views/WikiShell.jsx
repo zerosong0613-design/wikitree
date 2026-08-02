@@ -27,6 +27,9 @@ export default function WikiShell({
   newRuleMode,
   onSaveNewRule,
   onCancelNewRule,
+  // v0.5 조각 7c: 축 토글
+  axis,
+  onAxisChange,
 }) {
   // 트리에 룰 있을 때 초기 선택: 첫 hard, 없으면 첫 룰
   const derivedInitial = useMemo(() => {
@@ -56,6 +59,8 @@ export default function WikiShell({
         selectedRuleId={selectedRuleId}
         onSelect={onSelectRule}
         onOpenCategorySetup={onOpenCategorySetup}
+        axis={axis}
+        onAxisChange={onAxisChange}
       />
       {newRuleMode ? (
         <NewRuleForm

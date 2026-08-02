@@ -5,7 +5,7 @@
 // 코어 코드는 입구/렌즈 추가에도 바뀌지 않는다.
 // ============================================================
 import { normalizeRule, pathKey } from "./schema.js";
-import { enforcePath } from "./categories.js";
+import { enforcePath, enforceOrigin, enforceDepartment } from "./categories.js";
 
 export const TREE_KEY = "codex_tree";
 
@@ -70,14 +70,27 @@ function nextUniqueRuleId(tree) {
 
 // 새 룰들을 기존 트리에 병합해 반환한다(저장까지). 순수 병합 로직은 아래 merge().
 // v0.4: categoriesDoc이 넘어오면 path 유효성 검증 → 카테고리 밖이면 "미분류" 강제.
+// v0.5: tags.원천·의뢰부서도 검증 → 목록 밖이면 null.
 // (backward compat: 안 넘겨도 동작 — 초기 상태 or 카테고리 미설정 상황.)
 export function addRules(incoming, categoriesDoc = null) {
   const guarded = categoriesDoc
-    ? (incoming || []).map((r) => ({ ...r, path: enforcePath(r?.path, categoriesDoc) }))
+    ? (incoming || []).map((r) => guardRule(r, categoriesDoc))
     : incoming;
   const merged = merge(loadTree(), guarded);
   saveTree(merged);
   return merged;
+}
+
+// v0.5: path·tags 카테고리 검증을 한 곳에서.
+function guardRule(r, categoriesDoc) {
+  const path = enforcePath(r?.path, categoriesDoc);
+  const t = r?.tags || {};
+  const tags = {
+    원천: enforceOrigin(t["원천"], categoriesDoc),
+    의뢰부서: enforceDepartment(t["의뢰부서"], categoriesDoc),
+    주제: Array.isArray(t["주제"]) ? t["주제"] : [],
+  };
+  return { ...r, path, tags };
 }
 
 // 병합: 같은 path 있으면 숫자 합산 + 최신값 갱신, 없으면 추가.
@@ -113,6 +126,9 @@ export function merge(existing, incoming) {
         history: [...(cur.history || []), ...(r.history || [])],
         authors: mergeAuthors(cur.authors, r.authors),
         provenance: r.provenance || cur.provenance || null,
+        // v0.5 신규: tags·contract_view 병합.
+        tags: mergeTags(cur.tags, r.tags),
+        contract_view: r.contract_view || cur.contract_view || null,
       };
     } else {
       // 새 엔트리 push 시 id 유일성 강제.
@@ -147,6 +163,17 @@ function mergeAuthors(a = [], b = []) {
   return Array.from(byName.values());
 }
 
+// v0.5 조각 7a — tags 병합.
+// 단일 값(원천·의뢰부서): 새 값 우선, 없으면 기존 유지.
+// 배열(주제): 합집합.
+function mergeTags(a = {}, b = {}) {
+  return {
+    원천: b?.["원천"] || a?.["원천"] || null,
+    의뢰부서: b?.["의뢰부서"] || a?.["의뢰부서"] || null,
+    주제: Array.from(new Set([...(a?.["주제"] || []), ...(b?.["주제"] || [])])),
+  };
+}
+
 // 승인/삭제 (선택적 편의 — 코어 스키마 status만 건드림)
 export function setStatus(rules, id, status) {
   const out = rules.map((r) => (r.id === id ? { ...r, status } : r));
@@ -160,6 +187,7 @@ export function setStatus(rules, id, status) {
 // - 룰이 사라졌으면(경합) 그냥 현재 트리 반환.
 // v0.4: patchedRule의 path가 바뀌었으면 존중(사용자 path 이동). categoriesDoc이 있으면
 //        새 path를 카테고리에 대해 검증(카테고리 밖이면 "미분류"). backward compat: 안 넘겨도 동작.
+// v0.5: tags도 검증 (원천·의뢰부서 목록 밖이면 null).
 export function updateRule(id, patchedRule, categoriesDoc = null) {
   const tree = loadTree();
   const idx = tree.findIndex((r) => r.id === id);
@@ -169,9 +197,26 @@ export function updateRule(id, patchedRule, categoriesDoc = null) {
     ? patchedRule.path
     : cur.path;
   const guardedPath = categoriesDoc ? enforcePath(nextPath, categoriesDoc) : nextPath;
+
+  // v0.5: tags 검증
+  let guardedTags = patchedRule?.tags ?? cur.tags;
+  if (categoriesDoc && guardedTags) {
+    guardedTags = {
+      원천: enforceOrigin(guardedTags["원천"], categoriesDoc),
+      의뢰부서: enforceDepartment(guardedTags["의뢰부서"], categoriesDoc),
+      주제: Array.isArray(guardedTags["주제"]) ? guardedTags["주제"] : [],
+    };
+  }
+
   const out = tree.map((r) => ({ ...r }));
   out[idx] = normalizeRule(
-    { ...patchedRule, id, path: guardedPath, created_at: cur.created_at },
+    {
+      ...patchedRule,
+      id,
+      path: guardedPath,
+      tags: guardedTags,
+      created_at: cur.created_at,
+    },
     idx
   );
   saveTree(out);

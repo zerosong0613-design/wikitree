@@ -468,6 +468,59 @@
 .cs-save-btn { height:38px; padding:0 18px; border:2px solid var(--ink); border-radius:6px; background:var(--ink); color:var(--panel); font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
 .cs-save-btn:hover { background:var(--neu); border-color:var(--neu); color:var(--ink); }
 
+/* v0.5 조각 7b — [카테고리 설정] 3축 탭 */
+.cs-axis-tabs { display:flex; gap:4px; border-bottom:2px solid var(--ink); padding-bottom:0; margin-bottom:-2px; }
+.cs-axis-tab { border:2px solid var(--ink); border-bottom:0; border-radius:5px 5px 0 0; background:var(--bg); color:var(--sub); padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:8px; }
+.cs-axis-tab:hover { color:var(--ink); background:var(--panel); }
+.cs-axis-tab.on { background:var(--panel); color:var(--ink); position:relative; }
+.cs-axis-tab.on::after { content:""; position:absolute; left:0; right:0; bottom:-2px; height:2px; background:var(--panel); }
+.cs-axis-count { font-family:var(--mono); font-size:10px; color:var(--hold); background:#fff; border:1.5px solid var(--hold); border-radius:10px; padding:0 6px; min-width:18px; text-align:center; }
+.cs-axis-tab.on .cs-axis-count { border-color:var(--ink); color:var(--ink); }
+
+/* v0.5 조각 7c — 목차 축 토글 + 계약서별 nested */
+.toc-axis-tabs { display:flex; gap:3px; flex-wrap:wrap; margin-top:4px; }
+.toc-axis-tab { border:1.5px solid var(--hold); border-radius:14px; background:#fff; color:var(--sub); padding:3px 10px; font-size:11.5px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }
+.toc-axis-tab:hover { border-color:var(--ink); color:var(--ink); }
+.toc-axis-tab.on { background:var(--ink); border-color:var(--ink); color:var(--panel); }
+.toc-subgroup { display:flex; flex-direction:column; background:#fff; border-top:1px solid var(--bg); }
+.toc-subgroup-head { display:flex; align-items:center; gap:8px; padding:6px 13px 6px 26px; background:rgba(20,23,28,0.03); border-bottom:1px solid var(--bg); }
+.toc-subgroup-n { font-family:var(--mono); font-size:10.5px; color:var(--hold); flex:none; }
+.toc-subgroup-name { font-size:12.5px; font-weight:700; color:var(--sub); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.toc-leaf-article { font-family:var(--mono); font-size:11px; color:var(--sub); border:1.5px solid var(--hold); border-radius:3px; padding:0 6px; flex:none; }
+
+/* v0.5 조각 7d — 룰 페이지 태그 카드 + contract_view 카드 */
+.rp-tags-card { border:2px solid var(--ink); border-radius:5px; background:#fff; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.rp-tags-row { display:flex; gap:14px; flex-wrap:wrap; }
+.rp-tag-cell { display:flex; flex-direction:column; gap:4px; min-width:180px; flex:1; }
+.rp-tag-label { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--sub); text-transform:uppercase; }
+.rp-tag-select { height:32px; padding:0 10px; border:2px solid var(--ink); border-radius:4px; background:#fff; font-size:13px; font-family:inherit; }
+.rp-topics-row { display:flex; flex-direction:column; gap:4px; }
+.rp-topics { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.rp-topic-pill { display:inline-flex; align-items:center; gap:4px; height:26px; padding:0 8px 0 10px; border:2px solid var(--soft); border-radius:13px; background:rgba(200,135,31,0.08); font-size:12px; font-weight:600; }
+.rp-topic-remove { border:none; background:transparent; color:var(--hold); cursor:pointer; font-size:14px; padding:0 3px; line-height:1; }
+.rp-topic-remove:hover { color:var(--hard); }
+.rp-topic-input { height:26px; padding:0 10px; border:2px dashed var(--hold); border-radius:13px; background:transparent; font-size:12px; font-family:inherit; min-width:140px; flex:1; }
+.rp-topic-input:focus { outline:none; border-style:solid; border-color:var(--ink); background:#fff; }
+
+.rp-cv-card { border:2px solid var(--ink); border-radius:5px; background:#fff; padding:12px 14px; display:flex; flex-direction:column; gap:10px; cursor:pointer; }
+.rp-cv-card.editing { cursor:auto; border-color:var(--soft); background:rgba(200,135,31,0.05); }
+.rp-cv-card:hover:not(.editing) { background:rgba(200,135,31,0.06); }
+.rp-cv-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.rp-cv-actions { display:flex; gap:6px; }
+.rp-cv-hint { font-family:var(--mono); font-size:10px; color:var(--hold); }
+.rp-cv-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px 14px; }
+.rp-cv-row { display:flex; flex-direction:column; gap:3px; font-size:13px; }
+.rp-cv-k { font-family:var(--mono); font-size:10.5px; letter-spacing:0.1em; color:var(--sub); }
+.rp-cv-empty { font-size:12.5px; color:var(--hold); font-style:italic; padding:6px 0; }
+
+/* v0.5 조각 7e — NewRuleForm 다축 */
+.nrf-two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.nrf-two-col > div { display:flex; flex-direction:column; gap:5px; }
+.nrf-full { width:100%; }
+.nrf-cv-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.inr-suggest-tags { display:flex; flex-wrap:wrap; gap:5px; font-family:var(--mono); font-size:10.5px; color:var(--sub); }
+.inr-suggest-tag { border:1px solid var(--hold); border-radius:3px; padding:1px 6px; background:#fff; }
+
 /* ============================================================
    v0.4 조각 6b — 룰 페이지 개편
    본문 카드들(요약·hold 안내·재검토·관련 판단) + credit 한 줄 + path 이동 폼.
@@ -605,6 +658,7 @@
 .af-basis-dot { width:8px; height:8px; border-radius:50%; border:1.5px solid var(--ink); flex:none; }
 .af-basis-name { font-size:11.5px; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; }
 .af-basis-credit { font-family:var(--mono); font-size:10px; color:var(--sub); flex:none; }
+.af-basis-tag { font-family:var(--mono); font-size:10px; color:var(--sub); flex:none; border-left:1px solid var(--hold); padding-left:5px; }
 
 /* 로딩 버블 */
 .af-loading-bubble { flex-direction:row; align-items:center; gap:8px; color:var(--sub); font-size:12.5px; }

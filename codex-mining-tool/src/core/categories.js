@@ -1,15 +1,14 @@
 // ============================================================
-// 코어 — 카테고리 저장소 (CLAUDE.md v0.4 4.6장 · 원칙 11).
-// 사용자가 대·중분류를 미리 정한다. AI·입구는 이 안에서만 분류.
-// 안 맞으면 "미분류". 하드코딩 아님(원칙 4) — 이 파일은 저장소 API만.
+// 코어 — 카테고리 저장소 v2 (CLAUDE.md v0.5 4.6장 · 원칙 11·12).
+// 사용자가 3개 닫힌 축(판단·원천·의뢰부서)을 미리 정한다.
+// AI·입구는 이 안에서만 분류. 안 맞으면 "미분류"(판단) 또는 null(원천·부서).
+// 하드코딩 아님(원칙 4) — 프리셋은 시드일 뿐, 사용자가 편집·삭제 가능.
 // ============================================================
 
 export const CATEGORIES_KEY = "codex_categories";
 export const UNCATEGORIZED = "미분류";
 
-// 프리셋 "법무 기본 카테고리" 시드. 코드 상수지만 자동 심어지지 않는다 —
-// 사용자가 [카테고리 설정]에서 "불러오기" 버튼을 눌러야 저장소로 들어감.
-// 이후 편집·삭제 자유. 하드코딩 아님(하드코딩 = 코드가 강제하는 것).
+// v0.4에서 유지. "법무 기본" 판단 축 프리셋.
 export const PRESET_LEGAL = [
   { name: "정보통제", subs: ["비밀유지", "목적 외 이용", "데이터 활용"] },
   { name: "책임·분쟁", subs: ["손해배상", "면책", "관할"] },
@@ -19,19 +18,44 @@ export const PRESET_LEGAL = [
   { name: "분쟁 해결", subs: ["중재", "화해"] },
 ];
 
-// 저장소 load — 항상 정규화된 문서 반환.
+// v0.5 신규 — 원천 축 프리셋. 지식이 어디서 나왔나 (계약·자문·회의·사고·규제·내부규정).
+export const PRESET_ORIGIN = [
+  { name: "계약" },
+  { name: "자문" },
+  { name: "회의·의사결정" },
+  { name: "사고·분쟁대응" },
+  { name: "규제·법령대응" },
+  { name: "내부규정" },
+];
+
+// v0.5 신규 — 의뢰부서 축 프리셋. 판단을 요청한 부서.
+export const PRESET_DEPARTMENT = [
+  { name: "법무" },
+  { name: "인사" },
+  { name: "재무·세무" },
+  { name: "구매·조달" },
+  { name: "영업" },
+  { name: "연구개발" },
+  { name: "IT" },
+  { name: "경영지원" },
+];
+
+// v0.5 저장소 형식(v2):
+// { version: 2, 판단: [{name, subs?}], 원천: [{name}], 의뢰부서: [{name}] }
+// v1 문서(version:1, categories:[...])는 로드 시 자동 v2로 마이그레이션.
+
 export function loadCategories() {
   try {
     const raw = localStorage.getItem(CATEGORIES_KEY);
-    if (!raw) return { version: 1, categories: [] };
-    return normalizeCategoriesDoc(JSON.parse(raw));
+    if (!raw) return emptyDoc();
+    return migrateAndNormalize(JSON.parse(raw));
   } catch {
-    return { version: 1, categories: [] };
+    return emptyDoc();
   }
 }
 
 export function saveCategories(doc) {
-  const clean = normalizeCategoriesDoc(doc);
+  const clean = migrateAndNormalize(doc);
   localStorage.setItem(CATEGORIES_KEY, JSON.stringify(clean));
   return clean;
 }
@@ -40,53 +64,80 @@ export function clearCategories() {
   localStorage.removeItem(CATEGORIES_KEY);
 }
 
-// 프리셋을 저장소에 심는다. 이미 카테고리가 있으면 덮어쓰지 않고 병합할지 여부는
-// UI에서 결정(현재 UI는 "비었을 때만" 프리셋 버튼을 노출).
+// 판단 축 프리셋을 심음 — 원천·의뢰부서는 기존 그대로.
 export function loadPresetLegal() {
+  const cur = loadCategories();
   return saveCategories({
-    version: 1,
-    categories: PRESET_LEGAL.map((c) => ({ name: c.name, subs: [...c.subs] })),
+    ...cur,
+    "판단": PRESET_LEGAL.map((c) => ({ name: c.name, subs: [...c.subs] })),
   });
 }
 
-// path 유효성 검증 → 안 맞으면 미분류 경로로 교체.
-// - 카테고리 문서가 비어 있으면(초기) 그대로 통과(검증 skip).
-// - 대분류가 카테고리에 없으면 path[0]을 "미분류"로 교체(원 path[1..]는 유지).
-// - 대분류는 있는데 중분류가 그 대분류의 subs에 없으면 중분류를 빈 값으로.
+// v0.5 신규 — 원천 축 프리셋.
+export function loadPresetOrigin() {
+  const cur = loadCategories();
+  return saveCategories({
+    ...cur,
+    "원천": PRESET_ORIGIN.map((c) => ({ name: c.name })),
+  });
+}
+
+// v0.5 신규 — 의뢰부서 축 프리셋.
+export function loadPresetDepartment() {
+  const cur = loadCategories();
+  return saveCategories({
+    ...cur,
+    "의뢰부서": PRESET_DEPARTMENT.map((c) => ({ name: c.name })),
+  });
+}
+
+// path 유효성 검증 → 안 맞으면 미분류 경로로 교체 (판단 축).
 export function enforcePath(path, doc) {
-  const cats = doc?.categories || [];
+  const cats = doc?.["판단"] || [];
   if (cats.length === 0) return Array.isArray(path) ? path : [];
   const arr = Array.isArray(path) ? path.slice() : [];
   const major = arr[0];
   if (!major) return [UNCATEGORIZED];
   if (major === UNCATEGORIZED) return arr;
   const majorNode = cats.find((c) => c.name === major);
-  if (!majorNode) {
-    // 대분류 실종 → 미분류로. 원 major는 참고를 위해 note에 남길 수도 있으나 여기선 단순.
-    return [UNCATEGORIZED, ...arr.slice(1)];
-  }
+  if (!majorNode) return [UNCATEGORIZED, ...arr.slice(1)];
   const minor = arr[1];
   if (minor && !majorNode.subs.includes(minor)) {
-    // 중분류 유효 안함 → 대분류만 유지, 중분류 비움
     return [major, "", ...arr.slice(2)];
   }
   return arr;
 }
 
-// 대분류 이름이 카테고리 문서에 있는지.
-export function isMajorValid(major, doc) {
-  if (major === UNCATEGORIZED) return true;
-  return (doc?.categories || []).some((c) => c.name === major);
+// v0.5 신규 — 원천 값 검증. 목록에 있으면 그대로, 없으면 null.
+// UNCATEGORIZED는 원천에서는 통용되지 않음 (미지정 = null이면 충분).
+export function enforceOrigin(value, doc) {
+  if (!value) return null;
+  const cats = doc?.["원천"] || [];
+  if (cats.length === 0) return value; // 축이 비어있으면 통과(초기 상태)
+  return cats.some((c) => c.name === value) ? value : null;
 }
 
-// 목차 렌더용 그룹화 — 카테고리 순서대로 (빈 카테고리도 포함) + 맨 아래 "미분류".
+// v0.5 신규 — 의뢰부서 값 검증.
+export function enforceDepartment(value, doc) {
+  if (!value) return null;
+  const cats = doc?.["의뢰부서"] || [];
+  if (cats.length === 0) return value;
+  return cats.some((c) => c.name === value) ? value : null;
+}
+
+// 판단 축이 있는지.
+export function isMajorValid(major, doc) {
+  if (major === UNCATEGORIZED) return true;
+  return (doc?.["판단"] || []).some((c) => c.name === major);
+}
+
+// 목차 렌더용 그룹화 — 판단 축 기준 (v0.4 동일 유지).
 // { categorized: [{ name, leaves, holds, blind }], uncategorized: {...} | null }
 export function groupByCategories(rules, doc) {
-  const cats = doc?.categories || [];
+  const cats = doc?.["판단"] || [];
   const catNames = new Set(cats.map((c) => c.name));
 
-  // 대분류별 leaves
-  const bucketed = new Map(); // major → { leaves, holds }
+  const bucketed = new Map();
   for (const r of rules || []) {
     const major = r?.path?.[0] || UNCATEGORIZED;
     if (!bucketed.has(major)) bucketed.set(major, { leaves: [], holds: 0 });
@@ -95,7 +146,6 @@ export function groupByCategories(rules, doc) {
     if (r.kind === "hold") b.holds++;
   }
 
-  // 카테고리 순서대로 (빈 카테고리도 표시)
   const categorized = cats.map((c) => {
     const b = bucketed.get(c.name) || { leaves: [], holds: 0 };
     return {
@@ -109,7 +159,6 @@ export function groupByCategories(rules, doc) {
     };
   });
 
-  // 카테고리 밖 (미분류 포함) → 하단으로
   const uncatLeaves = [];
   let uncatHolds = 0;
   for (const [major, b] of bucketed) {
@@ -132,7 +181,121 @@ export function groupByCategories(rules, doc) {
   return { categorized, uncategorized };
 }
 
-// 대분류별 규칙 수 요약 — 카테고리 삭제 경고용 ({ [name]: count }).
+// v0.5 신규 — 축별 그룹화 (판단/계약서/부서/원천).
+// axis: "판단" | "계약서" | "부서" | "원천"
+// 반환은 축별로 살짝 다름. 최소 { categorized: [{name, leaves, holds?, blind?, subgroups?}], uncategorized: {...}|null, kind }.
+// kind: "flat"(리프 나열) | "nested"(2단 nested — 계약서별)
+export function groupByAxis(rules, axis, doc) {
+  if (axis === "판단" || !axis) {
+    const r = groupByCategories(rules, doc);
+    return { ...r, kind: "flat", axis: "판단" };
+  }
+  if (axis === "부서") return groupByTagAxis(rules, "의뢰부서", doc?.["의뢰부서"] || []);
+  if (axis === "원천") return groupByTagAxis(rules, "원천", doc?.["원천"] || []);
+  if (axis === "계약서") return groupByContract(rules);
+  return { categorized: [], uncategorized: null, kind: "flat", axis };
+}
+
+// tags[tagKey](단일 값)로 그룹핑. 목록(orderedCats) 순서대로, 없는 값은 미지정 하단.
+function groupByTagAxis(rules, tagKey, orderedCats) {
+  const catNames = new Set(orderedCats.map((c) => c.name));
+  const bucketed = new Map();
+  for (const r of rules || []) {
+    const v = r?.tags?.[tagKey] || null;
+    const key = v || null; // null이면 미지정
+    if (!bucketed.has(key)) bucketed.set(key, { leaves: [], holds: 0 });
+    const b = bucketed.get(key);
+    b.leaves.push(r);
+    if (r.kind === "hold") b.holds++;
+  }
+
+  const categorized = orderedCats.map((c) => {
+    const b = bucketed.get(c.name) || { leaves: [], holds: 0 };
+    return {
+      name: c.name,
+      leaves: b.leaves,
+      holds: b.holds,
+      blind:
+        b.holds > 0 &&
+        b.leaves.length > 0 &&
+        b.holds >= Math.ceil(b.leaves.length / 2),
+    };
+  });
+
+  // 카테고리 밖 (혹은 null=미지정)
+  const uncatLeaves = [];
+  let uncatHolds = 0;
+  for (const [key, b] of bucketed) {
+    if (key === null || !catNames.has(key)) {
+      uncatLeaves.push(...b.leaves);
+      uncatHolds += b.holds;
+    }
+  }
+  const uncategorized =
+    uncatLeaves.length > 0
+      ? {
+          name: "미지정",
+          leaves: uncatLeaves,
+          holds: uncatHolds,
+          blind:
+            uncatHolds > 0 && uncatHolds >= Math.ceil(uncatLeaves.length / 2),
+        }
+      : null;
+
+  return { categorized, uncategorized, kind: "flat", axis: tagKey };
+}
+
+// 계약서별 — 원천="계약" 룰만 · contract_group > contract_type > (article 순 leaves).
+// 2단 nested 반환. categorized: [{name, subgroups: [{name, leaves}]}].
+function groupByContract(rules) {
+  const contractRules = (rules || []).filter((r) => r?.tags?.["원천"] === "계약");
+  if (contractRules.length === 0) {
+    return { categorized: [], uncategorized: null, kind: "nested", axis: "계약서" };
+  }
+
+  // group by contract_group → contract_type
+  const grouped = new Map(); // group → Map(type → leaves)
+  for (const r of contractRules) {
+    const group = r.contract_view?.contract_group || "(미분류 계약군)";
+    const type = r.contract_view?.contract_type || "(미분류 계약)";
+    if (!grouped.has(group)) grouped.set(group, new Map());
+    const g = grouped.get(group);
+    if (!g.has(type)) g.set(type, []);
+    g.get(type).push(r);
+  }
+
+  // article 순 정렬 (있으면)
+  const articleSort = (a, b) => {
+    const an = extractArticleNum(a.contract_view?.article);
+    const bn = extractArticleNum(b.contract_view?.article);
+    if (an != null && bn != null) return an - bn;
+    return String(a.contract_view?.article || "").localeCompare(String(b.contract_view?.article || ""));
+  };
+
+  const categorized = [];
+  for (const [group, typeMap] of grouped) {
+    const subgroups = [];
+    let holds = 0;
+    let leaves = 0;
+    for (const [type, arr] of typeMap) {
+      arr.sort(articleSort);
+      subgroups.push({ name: type, leaves: arr });
+      leaves += arr.length;
+      holds += arr.filter((r) => r.kind === "hold").length;
+    }
+    categorized.push({ name: group, subgroups, holds, blind: false });
+  }
+
+  return { categorized, uncategorized: null, kind: "nested", axis: "계약서" };
+}
+
+function extractArticleNum(s) {
+  if (!s) return null;
+  const m = String(s).match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// 대분류별 규칙 수 요약 — 판단 축.
 export function countRulesByMajor(rules) {
   const out = {};
   for (const r of rules || []) {
@@ -142,13 +305,50 @@ export function countRulesByMajor(rules) {
   return out;
 }
 
-function normalizeCategoriesDoc(doc) {
-  if (!doc || typeof doc !== "object") return { version: 1, categories: [] };
+// ────────────────────────────────────────────
+// 내부: 마이그레이션·정규화
+// ────────────────────────────────────────────
+
+function emptyDoc() {
+  return { version: 2, "판단": [], "원천": [], "의뢰부서": [] };
+}
+
+// v1({version:1, categories}) → v2({version:2, 판단, 원천, 의뢰부서}) 마이그레이션.
+// 이미 v2면 그대로 정규화.
+function migrateAndNormalize(doc) {
+  if (!doc || typeof doc !== "object") return emptyDoc();
+
+  // v1 → v2
+  if (doc.categories && !doc["판단"]) {
+    return normalizeV2({
+      version: 2,
+      "판단": doc.categories,
+      "원천": [],
+      "의뢰부서": [],
+    });
+  }
+  return normalizeV2(doc);
+}
+
+function normalizeV2(doc) {
+  return {
+    version: 2,
+    "판단": normalizeAxisList(doc["판단"], true), // subs 있음
+    "원천": normalizeAxisList(doc["원천"], false),
+    "의뢰부서": normalizeAxisList(doc["의뢰부서"], false),
+  };
+}
+
+function normalizeAxisList(arr, withSubs) {
+  if (!Array.isArray(arr)) return [];
   const seen = new Set();
-  const clean = (Array.isArray(doc.categories) ? doc.categories : [])
-    .map((c) => ({
-      name: String(c?.name || "").trim(),
-      subs: Array.isArray(c?.subs)
+  const out = [];
+  for (const c of arr) {
+    const name = String(c?.name || "").trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    if (withSubs) {
+      const subs = Array.isArray(c?.subs)
         ? Array.from(
             new Set(
               c.subs
@@ -156,13 +356,11 @@ function normalizeCategoriesDoc(doc) {
                 .filter(Boolean)
             )
           )
-        : [],
-    }))
-    .filter((c) => {
-      if (!c.name) return false;
-      if (seen.has(c.name)) return false;
-      seen.add(c.name);
-      return true;
-    });
-  return { version: 1, categories: clean };
+        : [];
+      out.push({ name, subs });
+    } else {
+      out.push({ name });
+    }
+  }
+  return out;
 }

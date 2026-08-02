@@ -3,10 +3,10 @@
 // - 안 맞으면 "미분류"로. 코어(store.enforcePath)가 최종 방어.
 // 주의: 예시 JSON에 // 주석·플레이스홀더 넣지 않는다 — 모델이 흉내 내면 파싱이 깨진다.
 
-// v0.4 조각 6e — 계약 마이닝 프롬프트 (categoriesDoc 주입).
+// v0.5 조각 7e — 계약 마이닝 프롬프트 (3축 카테고리 + contract_view 주입).
 export function buildMiningPrompt(signedText, standardText, categoriesDoc) {
   const standard = standardText && standardText.trim() ? standardText.trim() : "없음";
-  const catBlock = categoriesBlockForPrompt(categoriesDoc);
+  const axesBlock = axesBlockForPrompt(categoriesDoc);
   return `당신은 기업 법무의 '계약 판단 채굴기'다. 아래 서명된 계약들을 읽고, 이 팀이 반복적으로 내리는 판단을 규칙으로 뽑아낸다. 규칙을 지어내지 말고, 실제 텍스트에서 반복되는 것만 뽑는다.
 
 [강도 판정 — 등장 횟수와 혼동하지 말 것]
@@ -19,15 +19,19 @@ export function buildMiningPrompt(signedText, standardText, categoriesDoc) {
 - 표준안이 주어지면: 각 조항이 서명본에서 몇 번 관철/양보됐는지 센다.
 - 표준안이 없으면: 반복 등장한 판단과 그 일관성으로 추정하고, 양보 수치는 만들지 마라.
 
-${catBlock}
+${axesBlock}
 
 [각 필드 설명]
-- path: [대분류, 중분류, 항목]. **대·중분류는 반드시 위 [카테고리] 목록에서 고른다** (새 대분류·중분류 발명 금지). 항목(3단)만 판단의 구체 소재로 짧게. 어디에도 안 맞으면 대분류를 "미분류"로 두고 이유를 note에 남긴다.
+- path: [대분류, 중분류, 항목]. **대·중분류는 반드시 위 [판단 축] 목록에서 고른다** (새 대분류·중분류 발명 금지). 항목(3단)만 판단의 구체 소재로 짧게. 어디에도 안 맞으면 대분류를 "미분류"로.
 - kind: hard | soft | neu | hold 중 하나.
 - strength_label: 마지노선 | 협상 여지 | 신규·미확정 | 사람 확인 중 하나.
-- held / total: 미터용 정수. 표준안이 없으면 등장 횟수/표본 수로. 세지 못하면 둘 다 0.
+- held / total: 미터용 정수. 표준안이 없으면 등장 횟수/표본 수로.
 - badge: "관철 30/30" 또는 "등장 7건" 또는 "14 : 16 갈림" 같은 짧은 문자열.
 - origin: "계약 마이닝(diff)" 로 둔다.
+- **tags.원천: 반드시 "계약"** (계약 마이닝이므로).
+- **tags.의뢰부서: [의뢰부서 축]에서 고른다** (계약 검토 요청 부서 · 알 수 없으면 null).
+- **tags.주제: 2~4개 자유 태그** (예: "배상", "NDA", "IP", "AI데이터" 등).
+- **contract_view: 원천이 "계약"이므로 필수. contract_type(계약 종류 · 예: NDA(국문), 위수탁계약)·contract_group(계약 그룹 · 예: 정보보호 계약)·article(조항 · 예: 제7조)·article_title(조항 제목).**
 - review_trigger.keywords: 이 신호가 새 입력에 있으면 이 노드가 후보. 3~6개.
 - review_trigger.law_group: 규제와 얽힌 노드만 채우고, 아니면 null.
 - review_trigger.test: 애매할 때 판정하는 한 문장.
@@ -46,6 +50,17 @@ ${catBlock}
       "badge": "관철 30/30",
       "note": "양보 0 · 한 번도 안 내줌",
       "origin": "계약 마이닝(diff)",
+      "tags": {
+        "원천": "계약",
+        "의뢰부서": "구매·조달",
+        "주제": ["배상", "손해", "NDA"]
+      },
+      "contract_view": {
+        "contract_type": "위수탁계약",
+        "contract_group": "위수탁 계약",
+        "article": "제7조",
+        "article_title": "손해배상"
+      },
       "review_trigger": {
         "keywords": ["배상", "손해", "한도"],
         "law_group": null,
@@ -78,6 +93,17 @@ export function buildAiFindPrompt(question, rules) {
     note: r.note || "",
     authors: Array.isArray(r.authors) ? r.authors.map((a) => a.name).filter(Boolean) : [],
     source_contract: r?.provenance?.source_contract || null,
+    // v0.5 조각 7f — 다축 태그 컨텍스트
+    origin: r?.tags?.["원천"] || null,
+    department: r?.tags?.["의뢰부서"] || null,
+    topics: Array.isArray(r?.tags?.["주제"]) ? r.tags["주제"] : [],
+    contract: r?.contract_view
+      ? {
+          type: r.contract_view.contract_type,
+          group: r.contract_view.contract_group,
+          article: r.contract_view.article,
+        }
+      : null,
   }));
 
   return `당신은 이 팀이 위키에 쌓아 온 판단 기준을 근거로 답하는 도우미다.
@@ -108,53 +134,81 @@ ${String(question || "").trim()}
 ${JSON.stringify(minimal, null, 2)}`;
 }
 
-// v0.4 조각 6e — AI path 제안 프롬프트 (재작성).
-// v0.3의 rules 인자·is_new_major 필드 제거. codex_categories 안에서만 제안.
-// 반환: {suggestions: [{path, reason}, ...]}
-export function buildPathSuggestPrompt(judgment, categoriesDoc, initialPath = []) {
-  const catBlock = categoriesBlockForPrompt(categoriesDoc);
+// v0.5 조각 7e — AI 태그 제안 프롬프트 (다축 확장).
+// v0.4의 buildPathSuggestPrompt를 대체. 판단 path뿐 아니라 원천·의뢰부서·주제·contract_view까지 제안.
+// 반환: {suggestions: [{path, tags, contract_view?, reason}, ...]}
+export function buildTagsSuggestPrompt(judgment, categoriesDoc, initialPath = [], initialTags = {}) {
+  const axesBlock = axesBlockForPrompt(categoriesDoc);
   const initHint = (initialPath || []).filter(Boolean).join(" > ") || "없음";
-  return `당신은 이 팀의 판단 위키 taxonomy 도우미다.
-사용자가 새로 심으려는 판단문을 보고, 아래 [카테고리] 안에서 path 3개를 제안한다.
+  const initTagsHint = JSON.stringify(initialTags || {}, null, 0);
+  return `당신은 이 팀의 판단 위키 다축 태그 도우미다.
+사용자가 새로 심으려는 판단문을 보고, 아래 [카테고리] 안에서 판단 path + 원천 + 의뢰부서 + 주제를 제안한다.
+원천이 "계약"이면 contract_view(계약종류·조항)도 함께 제안한다.
 
 [출력 규칙]
 - JSON만 출력. 마크다운·주석·설명 문장 없음.
-- 정확히 3개의 제안. 각 제안은 path(대분류·중분류·항목 3단 배열) + reason(왜 이 자리인가 한 줄).
-- **대·중분류는 반드시 아래 [카테고리]에서 고른다.** 새 대분류·중분류 발명 금지 (원칙 10·11).
-- 항목(path[2])만 판단문의 성격으로 새로 만든다. 짧게(예: "배상 상한", "면책 범위").
-- 어디에도 안 맞으면 대분류 "미분류"로. 이 경우에도 reason에 왜 안 맞는지 한 줄.
-- initialPath가 주어졌으면 그 시작 경로를 존중.
-- 판단의 "성격"으로 묶어라. 문서 종류·계약 종류로 나누지 마라 — 그건 provenance에.
+- 정확히 3개의 제안.
+- **path의 대·중분류는 반드시 [판단 축]에서.** 새 발명 금지. 항목(path[2])만 짧게 새로.
+- **tags.원천은 반드시 [원천 축]에서.** 확실치 않으면 null.
+- **tags.의뢰부서는 반드시 [의뢰부서 축]에서.** 확실치 않으면 null.
+- **tags.주제는 자유 배열(2~4개).**
+- **contract_view는 원천="계약"일 때만 채운다** (contract_type·contract_group·article·article_title). 아니면 null.
+- initialPath·initialTags가 주어졌으면 그것을 존중.
+- 판단의 "성격"으로 묶어라. 문서 종류로 나누지 마라 — 그건 원천에.
 
 [출력 형식]
 {
   "suggestions": [
-    { "path": ["대분류", "중분류", "항목"], "reason": "..." },
-    { "path": ["대분류", "중분류", "항목"], "reason": "..." },
-    { "path": ["대분류", "중분류", "항목"], "reason": "..." }
+    {
+      "path": ["대분류", "중분류", "항목"],
+      "tags": { "원천": "계약", "의뢰부서": "구매·조달", "주제": ["배상", "NDA"] },
+      "contract_view": { "contract_type": "NDA(국문)", "contract_group": "정보보호 계약", "article": "제7조", "article_title": "손해배상" },
+      "reason": "..."
+    }
   ]
 }
 
-${catBlock}
+${axesBlock}
 
 [새 판단]
 ${String(judgment || "").trim()}
 
 [초기 경로 (있으면 존중)]
-${initHint}`;
+${initHint}
+
+[초기 태그 (있으면 존중)]
+${initTagsHint}`;
 }
 
-// v0.4 조각 6e — 카테고리 블록 헬퍼 (프롬프트 컨텍스트용).
-// 형식: "- 대분류 (중분류1, 중분류2)" 여러 줄.
-function categoriesBlockForPrompt(doc) {
-  const cats = doc?.categories || [];
-  if (cats.length === 0) {
-    return `[카테고리]
-(설정되지 않음 — 이 경우 대분류를 "미분류"로 통일하라. 코어가 최종 검증한다.)`;
+// backward compat — 기존 코드가 buildPathSuggestPrompt를 부르면 buildTagsSuggestPrompt로 위임.
+export function buildPathSuggestPrompt(judgment, categoriesDoc, initialPath = []) {
+  return buildTagsSuggestPrompt(judgment, categoriesDoc, initialPath, {});
+}
+
+// v0.5 조각 7e — 3축 카테고리 블록 헬퍼 (프롬프트 컨텍스트용).
+function axesBlockForPrompt(doc) {
+  const 판단 = doc?.["판단"] || [];
+  const 원천 = doc?.["원천"] || [];
+  const 의뢰부서 = doc?.["의뢰부서"] || [];
+
+  const lines = [];
+  lines.push("[판단 축 — v0.5 필수 제약]");
+  if (판단.length === 0) lines.push("(설정되지 않음 — 대분류 '미분류'로 통일)");
+  else {
+    for (const c of 판단) {
+      lines.push(`- ${c.name}${c.subs?.length ? ` (${c.subs.join(", ")})` : ""}`);
+    }
   }
-  const lines = cats.map(
-    (c) => `- ${c.name}${c.subs.length ? ` (${c.subs.join(", ")})` : ""}`
-  );
-  return `[카테고리 — v0.4 필수 제약]
-${lines.join("\n")}`;
+
+  lines.push("");
+  lines.push("[원천 축 — 반드시 이 목록에서]");
+  if (원천.length === 0) lines.push("(설정되지 않음 — null 허용)");
+  else for (const c of 원천) lines.push(`- ${c.name}`);
+
+  lines.push("");
+  lines.push("[의뢰부서 축 — 반드시 이 목록에서]");
+  if (의뢰부서.length === 0) lines.push("(설정되지 않음 — null 허용)");
+  else for (const c of 의뢰부서) lines.push(`- ${c.name}`);
+
+  return lines.join("\n");
 }

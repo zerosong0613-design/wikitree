@@ -214,6 +214,9 @@ function AiBubble({ msg, rulesById, onSelectRule }) {
             const rule = rulesById.get(b.rule_id);
             if (!rule) return null;
             const color = KIND_COLOR[rule.kind];
+            const originTag = rule?.tags?.["원천"];
+            const deptTag = rule?.tags?.["의뢰부서"];
+            const tagLabel = [originTag, deptTag].filter(Boolean).join(" · ");
             return (
               <button
                 key={b.rule_id + i}
@@ -232,6 +235,7 @@ function AiBubble({ msg, rulesById, onSelectRule }) {
                 />
                 <span className="af-basis-name">{ruleShort(rule)}</span>
                 <span className="af-basis-credit">{formatCredit(rule)}</span>
+                {tagLabel && <span className="af-basis-tag">{tagLabel}</span>}
               </button>
             );
           })}

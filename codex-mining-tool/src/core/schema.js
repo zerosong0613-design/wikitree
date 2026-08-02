@@ -28,6 +28,41 @@ export function pathKey(path) {
     .join("␟");
 }
 
+// v0.5 조각 7a — 다축 태그 정규화.
+// tags = { 원천: string|null, 의뢰부서: string|null, 주제: string[] }.
+// 원천·의뢰부서는 닫힌 축(단일 값). 주제는 열린 축(dedupe 배열).
+// v0.4 룰(tags 없음)은 전부 null/빈 배열 폴백.
+function normalizeTags(t) {
+  const o = t && typeof t === "object" ? t : {};
+  const origin = o["원천"] ? String(o["원천"]).trim() : "";
+  const dept = o["의뢰부서"] ? String(o["의뢰부서"]).trim() : "";
+  return {
+    원천: origin || null,
+    의뢰부서: dept || null,
+    주제: Array.isArray(o["주제"])
+      ? Array.from(new Set(o["주제"].map((s) => String(s || "").trim()).filter(Boolean)))
+      : [],
+  };
+}
+
+// v0.5 조각 7a — 계약 자세 정규화.
+// 원천=계약일 때만 값 유지. 원천이 다른 값이면 항상 null (스키마 단에서 정리).
+function normalizeContractView(cv, originValue) {
+  if (originValue !== "계약") return null;
+  if (!cv || typeof cv !== "object") return null;
+  const contract_type = String(cv.contract_type || "").trim();
+  const contract_group = String(cv.contract_group || "").trim();
+  const article = String(cv.article || "").trim();
+  const article_title = String(cv.article_title || "").trim();
+  if (!contract_type && !contract_group && !article && !article_title) return null;
+  return {
+    contract_type: contract_type || null,
+    contract_group: contract_group || null,
+    article: article || null,
+    article_title: article_title || null,
+  };
+}
+
 // authors/history/provenance 정규화 (v0.3 신규 3필드, CLAUDE.md 4장).
 // 폴백: 없으면 각각 [], [], null. v0.1 룰 호환.
 function normalizeAuthor(a) {
@@ -121,6 +156,16 @@ export function normalizeRule(r, i = 0) {
     related: Array.isArray(r?.related)
       ? Array.from(new Set(r.related.map((x) => String(x || "").trim()).filter(Boolean)))
       : [],
+    // v0.5 신규 2필드 (CLAUDE.md 4장 · 조각 7a)
+    // tags: 판단 외 다축(원천·의뢰부서·주제). path는 여전히 판단 축의 정본.
+    // contract_view: 원천=계약일 때만 (계약종류·계약군·조항). AI가 자동 채움.
+    ...(() => {
+      const tags = normalizeTags(r?.tags);
+      return {
+        tags,
+        contract_view: normalizeContractView(r?.contract_view, tags["원천"]),
+      };
+    })(),
   };
 }
 

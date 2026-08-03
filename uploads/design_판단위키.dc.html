@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+html,body{margin:0;padding:0;background:#E9EBE6;font-family:Pretendard,system-ui,sans-serif;color:#14171C}
+a{color:#9E3524;text-decoration:none}a:hover{color:#14171C;text-decoration:underline}
+@keyframes pw-pop{0%{transform:translateY(-6px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes pw-fade{0%{opacity:0}100%{opacity:1}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#E9EBE6;display:flex;flex-direction:column">
+
+  <nav style="background:#14171C;color:#F5F6F3;padding:0 22px;height:56px;display:flex;align-items:center;gap:22px">
+    <div style="display:flex;align-items:center;gap:10px;flex:none">
+      <div style="width:26px;height:26px;border:2px solid #C8871F;border-radius:5px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#C8871F">C</div>
+      <span style="font-size:17px;font-weight:800;letter-spacing:-.01em">CODEX 판단 위키</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden">
+      <div style="height:32px;padding:0 13px;border-radius:5px;background:#F5F6F3;color:#14171C;display:flex;align-items:center;font-size:13px;font-weight:700;white-space:nowrap;flex:none">판단 찾기</div>
+      <button onClick="{{ openSetup }}" style="height:32px;padding:0 13px;border:2px solid #4B534A;border-radius:5px;background:transparent;color:#E9EBE6;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none">카테고리 설정</button>
+      <div style="height:32px;padding:0 13px;border:2px solid #4B534A;border-radius:5px;display:flex;align-items:center;font-size:13px;font-weight:600;color:#E9EBE6;white-space:nowrap;flex:none">지식 넣기</div>
+    </div>
+    <div style="flex:1;min-width:0;display:flex;justify-content:flex-end;align-items:center;gap:10px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8A9086;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ stateHint }}</span>
+      <sc-for list="{{ viewToggles }}" as="v" hint-placeholder-count="3">
+        <button onClick="{{ v.go }}" style="height:30px;padding:0 11px;border:2px solid #4B534A;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex:none;background:{{ v.bg }};color:{{ v.fg }}">{{ v.label }}</button>
+      </sc-for>
+    </div>
+  </nav>
+
+  <div style="flex:1;display:flex;justify-content:center;padding:18px 22px 36px">
+  <div style="width:1500px;max-width:100%;min-width:1180px;display:grid;grid-template-columns:minmax(260px,320px) minmax(440px,1fr) minmax(280px,350px);gap:16px;align-items:start">
+
+    <aside style="background:#F5F6F3;border:2px solid #14171C;border-radius:4px;display:flex;flex-direction:column;max-height:calc(100vh - 110px);position:sticky;top:18px;overflow:hidden">
+      <div style="padding:14px;display:flex;flex-direction:column;gap:10px;border-bottom:2px solid #14171C;background:#F5F6F3">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span style="font-size:16px;font-weight:800">목차</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#4B534A;white-space:nowrap;flex:none">규칙 {{ total }}개</span>
+        </div>
+        <div style="height:34px;border:2px solid #14171C;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;gap:8px;padding:0 11px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A9086;flex:none">⌕</span>
+          <span style="font-size:13px;color:#8A9086;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">판단 검색</span>
+        </div>
+        <button onClick="{{ openSetup }}" style="height:32px;border:2px solid #14171C;border-radius:5px;background:#FFFFFF;font-size:12.5px;font-weight:700;cursor:pointer">카테고리 설정</button>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+        <sc-if value="{{ noCategory }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:18px 14px;display:flex;flex-direction:column;gap:9px;align-items:flex-start">
+            <span style="font-size:13.5px;font-weight:700">카테고리가 아직 없습니다</span>
+            <span style="font-size:12.5px;line-height:1.55;color:#4B534A">먼저 판단을 분류할 큰 틀을 정해주세요.</span>
+            <button onClick="{{ openSetup }}" style="height:32px;padding:0 13px;border:2px solid #14171C;border-radius:5px;background:#C8871F;font-size:12.5px;font-weight:700;cursor:pointer">카테고리 설정</button>
+          </div>
+        </sc-if>
+
+        <sc-for list="{{ toc }}" as="g" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column">
+            <button onClick="{{ g.toggle }}" style="position:sticky;top:0;z-index:2;border:0;border-bottom:2px solid #E9EBE6;background:{{ g.headBg }};color:{{ g.headFg }};padding:11px 13px;display:flex;align-items:center;gap:9px;cursor:pointer;text-align:left;font-family:inherit">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;flex:none;opacity:.8">{{ g.caret }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;flex:none;opacity:.75">{{ g.n }}.</span>
+              <span style="font-size:14.5px;font-weight:700;flex:1;min-width:0">{{ g.name }}</span>
+              <sc-if value="{{ g.blind }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:12px;flex:none">⚠</span>
+              </sc-if>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;opacity:.8;white-space:nowrap;flex:none">{{ g.count }}</span>
+            </button>
+            <sc-if value="{{ g.open }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;background:#FFFFFF;border-bottom:2px solid #E9EBE6;animation:pw-fade 200ms ease-out">
+                <sc-for list="{{ g.items }}" as="i" hint-placeholder-count="3">
+                  <button onClick="{{ i.open }}" style="border:0;border-top:1px solid #E9EBE6;background:{{ i.bg }};padding:9px 13px 9px 34px;display:flex;align-items:center;gap:9px;cursor:pointer;text-align:left;font-family:inherit">
+                    <div style="width:9px;height:9px;flex:none;border-radius:50%;border:1.5px solid #14171C;background:{{ i.dot }};border-style:{{ i.dotStyle }}"></div>
+                    <span style="font-size:13px;font-weight:{{ i.weight }};flex:1;min-width:0;color:#14171C">{{ i.name }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ hasCategory }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:auto;border-top:2px solid #14171C;padding:11px 13px;display:flex;align-items:center;gap:9px;background:#F5F6F3">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8A9086;flex:none">▸</span>
+            <span style="font-size:13.5px;font-weight:700;color:#4B534A;flex:1">미분류</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#4B534A;white-space:nowrap;flex:none">2개</span>
+          </div>
+        </sc-if>
+      </div>
+    </aside>
+
+    <main style="background:#F5F6F3;border:2px solid #14171C;border-radius:4px;padding:22px 26px 24px;display:flex;flex-direction:column;gap:16px;min-height:640px">
+      <sc-if value="{{ noCategory }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;text-align:center;padding:40px 20px">
+          <h2 style="margin:0;font-size:32px;font-weight:800;letter-spacing:-.02em">먼저 카테고리를 정하세요</h2>
+          <span style="font-size:15px;line-height:1.6;color:#4B534A;max-width:440px;text-wrap:pretty">앞으로 모든 판단은 이 카테고리 안에 분류됩니다. 큰 틀을 먼저 정하면 찾기가 쉬워져요.</span>
+          <button onClick="{{ openSetup }}" style="height:40px;padding:0 20px;border:2px solid #14171C;border-radius:6px;background:#C8871F;font-size:14px;font-weight:700;cursor:pointer">카테고리 설정하기</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ noRules }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;text-align:center;padding:40px 20px">
+          <h2 style="margin:0;font-size:28px;font-weight:800;letter-spacing:-.02em">카테고리는 준비됐어요</h2>
+          <span style="font-size:15px;line-height:1.6;color:#4B534A;max-width:420px;text-wrap:pretty">이제 <strong>지식 넣기</strong>에서 실제 판단을 채우면 이 목차 안에 쌓입니다.</span>
+          <div style="height:40px;padding:0 20px;border:2px solid #14171C;border-radius:6px;background:#FFFFFF;display:flex;align-items:center;font-size:14px;font-weight:700">지식 넣기로 이동</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ hasRule }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:16px;animation:pw-pop 220ms cubic-bezier(.2,.8,.3,1)">
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:12.5px;color:#4B534A">
+            <span>판단 찾기</span><span style="color:#8A9086">›</span>
+            <a href="#0">{{ rule.group }}</a><span style="color:#8A9086">›</span>
+            <a href="#0">{{ rule.sub }}</a><span style="color:#8A9086">›</span>
+            <span style="font-weight:700;color:#14171C">{{ rule.short }}</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <h1 style="margin:0;font-size:30px;font-weight:800;line-height:1.32;letter-spacing:-.02em;text-wrap:pretty">{{ rule.title }}</h1>
+            <span style="font-size:12.5px;color:#4B534A;text-wrap:pretty">{{ rule.credit }}</span>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+            <span style="font-size:12px;font-weight:700;padding:5px 11px;border-radius:4px;background:{{ rule.color }};color:{{ rule.fg }};white-space:nowrap;flex:none">{{ rule.strength }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;padding:4px 10px;border:2px solid #14171C;border-radius:4px;background:#FFFFFF;white-space:nowrap;flex:none">{{ rule.badge }}</span>
+            <span style="font-size:12.5px;color:#4B534A">{{ rule.badgeNote }}</span>
+          </div>
+
+          <div style="border:2px solid #14171C;border-radius:5px;background:#FFFFFF;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#4B534A">요약</span>
+            <span style="font-size:15.5px;line-height:1.65;text-wrap:pretty">{{ rule.summary }}</span>
+          </div>
+
+          <sc-if value="{{ rule.isHold }}" hint-placeholder-val="{{ false }}">
+            <div style="border:2px dashed #8A9086;border-radius:5px;background:rgba(138,144,134,.14);padding:15px 17px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font-size:14px;flex:none">⚠</span>
+                <span style="font-size:15px;font-weight:800">팀 판단이 갈린 자리 · 사람 확인 필요</span>
+              </div>
+              <span style="font-size:13.5px;line-height:1.6;color:#4B534A;text-wrap:pretty">{{ rule.holdNote }}</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+                <div style="height:32px;padding:0 13px;border:2px solid #14171C;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;font-size:12.5px;font-weight:700">토론 열기</div>
+                <div style="height:32px;padding:0 13px;border:2px solid #14171C;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;font-size:12.5px;font-weight:700">담당자 지정</div>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="border:2px solid #14171C;border-radius:5px;background:#FFFFFF;padding:15px 17px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div style="display:flex;flex-direction:column;gap:3px;flex:1;min-width:220px">
+              <span style="font-size:14px;font-weight:800">재검토</span>
+              <span style="font-size:12.5px;color:#4B534A;text-wrap:pretty">{{ rule.recheck }}</span>
+            </div>
+            <button onClick="{{ noop }}" style="height:34px;padding:0 14px;border:2px solid #14171C;border-radius:5px;background:#C8871F;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex:none">재검토 요청</button>
+          </div>
+
+          <div style="border-top:2px solid #14171C;padding-top:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:700;flex:none">관련 판단 :</span>
+            <sc-for list="{{ rule.related }}" as="r" hint-placeholder-count="2">
+              <button onClick="{{ r.go }}" style="height:30px;padding:0 12px;border:2px solid #9E3524;border-radius:5px;background:#FFFFFF;color:#9E3524;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex:none">{{ r.name }}</button>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+
+    <aside style="background:#F5F6F3;border:2px solid #14171C;border-radius:4px;padding:16px;display:flex;flex-direction:column;gap:12px;position:sticky;top:18px">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font-size:16px;font-weight:800">AI 찾기</span>
+        <span style="font-size:12px;color:#4B534A">우리 판단에서만 답을 찾습니다</span>
+      </div>
+      <div style="height:36px;border:2px solid #14171C;border-radius:5px;background:#FFFFFF;display:flex;align-items:center;gap:8px;padding:0 11px">
+        <span style="font-size:13px;color:#8A9086;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">무엇을 확인할까요?</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#14171C;flex:none">↵</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:11px">
+        <sc-for list="{{ chat }}" as="c" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:7px;align-self:{{ c.align }};max-width:100%;border:2px solid #14171C;border-radius:9px;background:{{ c.bg }};padding:11px 13px;border-style:{{ c.borderStyle }};border-color:{{ c.borderColor }}">
+            <span style="font-size:13.5px;font-weight:{{ c.weight }};line-height:1.55;text-wrap:pretty">{{ c.text }}</span>
+            <sc-if value="{{ c.hasSource }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+                <span style="font-size:11.5px;color:#4B534A;flex:none">근거 :</span>
+                <sc-for list="{{ c.sources }}" as="s" hint-placeholder-count="1">
+                  <button onClick="{{ s.go }}" style="display:flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:2px solid {{ s.color }};border-radius:13px;background:#FFFFFF;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none">
+                    <div style="width:8px;height:8px;border-radius:50%;background:{{ s.color }};flex:none"></div>
+                    <span style="font-size:11.5px;font-weight:700;color:#14171C">{{ s.name }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4B534A">{{ s.credit }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ c.noBasis }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:8px;border:2px dashed #8A9086;border-radius:5px;background:rgba(138,144,134,.14);padding:8px 10px">
+                <span style="font-size:12px;flex:none">⚠</span>
+                <span style="font-size:12px;font-weight:700">확정 기준 없음 · 사람 확인 필요</span>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;border-top:2px solid #14171C;padding-top:13px">
+        <div style="width:64px;flex:none">
+          <svg viewBox="0 0 150 132" style="width:64px;height:57px;display:block;overflow:visible">
+            <path d="M6 120 C4 100 26 88 44 94 C54 78 96 78 106 94 C126 88 146 100 144 120 Z" fill="#E3CBA4" stroke="#14171C" stroke-width="3.6" stroke-linejoin="round"></path>
+            <path d="M34 108 C28 58 48 30 75 30 C102 30 122 58 116 108 Z" fill="#7A5A44" stroke="#14171C" stroke-width="3.6" stroke-linejoin="round"></path>
+            <g stroke="#14171C" stroke-width="2.6" stroke-linecap="round" fill="none">
+              <path d="M40 80 L14 74 M40 88 L12 88 M110 80 L136 74 M110 88 L138 88"></path>
+              <path d="M46 46 C58 30 92 30 104 46" stroke-width="3"></path>
+            </g>
+            <circle cx="75" cy="28" r="10" fill="#C8871F" stroke="#14171C" stroke-width="3"></circle>
+            <circle cx="75" cy="28" r="3.4" fill="#F5F6F3"></circle>
+            <g fill="none" stroke="#14171C" stroke-width="2.8">
+              <circle cx="60" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+              <circle cx="90" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+              <path d="M71 70 h8"></path>
+            </g>
+            <ellipse cx="60" cy="70" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+            <ellipse cx="90" cy="70" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+            <circle cx="67" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.8"></circle>
+            <circle cx="83" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.8"></circle>
+            <ellipse cx="75" cy="85" rx="6" ry="4.6" fill="#9E3524" stroke="#14171C" stroke-width="2.6"></ellipse>
+          </svg>
+        </div>
+        <div style="flex:1;position:relative;background:#E9EBE6;border:2px solid #14171C;border-radius:10px;padding:11px 13px">
+          <span style="font-size:13.5px;font-weight:600;line-height:1.5">{{ codyLine }}</span>
+          <div style="position:absolute;left:-9px;bottom:12px;width:14px;height:14px;background:#E9EBE6;border-left:2px solid #14171C;border-bottom:2px solid #14171C;transform:rotate(45deg)"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+  </div>
+
+  <sc-if value="{{ setupOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:50;background:rgba(20,23,28,.55);display:flex;align-items:center;justify-content:center;padding:32px;animation:pw-fade 180ms ease-out">
+      <div style="width:900px;max-width:100%;max-height:100%;overflow-y:auto;background:#F5F6F3;border:2px solid #14171C;border-radius:6px;padding:24px 26px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <h2 style="margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em">카테고리 설정</h2>
+            <span style="font-size:13px;color:#4B534A">판단을 분류할 큰 틀</span>
+          </div>
+          <button onClick="{{ closeSetup }}" style="width:34px;height:34px;flex:none;border:2px solid #14171C;border-radius:5px;background:#FFFFFF;font-size:14px;font-weight:700;cursor:pointer">✕</button>
+        </div>
+
+        <div style="border:2px solid #14171C;border-radius:5px;background:#FFFFFF;padding:13px 15px;font-size:13.5px;line-height:1.6;text-wrap:pretty">먼저 카테고리를 정하세요. 앞으로 모든 판단은 이 카테고리 안에 분류됩니다.</div>
+
+        <sc-if value="{{ setupEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="border:2px dashed #8A9086;border-radius:5px;background:rgba(138,144,134,.12);padding:22px;display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center">
+            <span style="font-size:14px;font-weight:700">아직 카테고리가 없습니다</span>
+            <span style="font-size:13px;color:#4B534A;max-width:420px;text-wrap:pretty">법무에서 자주 쓰는 6개를 한 번에 불러온 뒤 이름만 다듬어도 됩니다.</span>
+            <button onClick="{{ loadPreset }}" style="height:38px;padding:0 18px;border:2px solid #14171C;border-radius:6px;background:#C8871F;font-size:13.5px;font-weight:700;cursor:pointer">법무 기본 카테고리 불러오기</button>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4B534A;text-wrap:pretty">정보통제 / 책임·분쟁 / 절차·기한 / 규제 대응 / 계약 일반 / 분쟁 해결</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ setupHasList }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+              <span style="font-size:14px;font-weight:800">대분류</span>
+              <button onClick="{{ noop }}" style="height:32px;padding:0 13px;border:2px solid #14171C;border-radius:5px;background:#FFFFFF;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex:none">+ 대분류 추가</button>
+            </div>
+            <sc-for list="{{ setupList }}" as="g" hint-placeholder-count="6">
+              <div style="border:2px solid #14171C;border-radius:5px;background:#FFFFFF;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#4B534A;white-space:nowrap;flex:none">{{ g.n }}.</span>
+                  <span style="font-size:15px;font-weight:700;flex:1;min-width:120px">{{ g.name }}</span>
+                  <div style="display:flex;gap:6px;flex:none">
+                    <div style="height:28px;padding:0 10px;border:2px solid #8A9086;border-radius:4px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#4B534A;white-space:nowrap">이름 편집</div>
+                    <div style="height:28px;padding:0 10px;border:2px solid #8A9086;border-radius:4px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#4B534A;white-space:nowrap">순서 ↑↓</div>
+                    <div style="height:28px;padding:0 10px;border:2px solid #9E3524;border-radius:4px;display:flex;align-items:center;font-size:11.5px;font-weight:700;color:#9E3524;white-space:nowrap">삭제</div>
+                  </div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:7px;padding-left:22px">
+                  <sc-for list="{{ g.subs }}" as="s" hint-placeholder-count="2">
+                    <div style="height:28px;padding:0 11px;border:2px solid #E9EBE6;border-radius:14px;background:#F5F6F3;display:flex;align-items:center;font-size:12px;font-weight:600;white-space:nowrap">{{ s.name }}</div>
+                  </sc-for>
+                  <button onClick="{{ noop }}" style="height:28px;padding:0 11px;border:2px dashed #8A9086;border-radius:14px;background:transparent;font-size:12px;font-weight:700;color:#4B534A;cursor:pointer;white-space:nowrap">+ 중분류</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;align-items:flex-end;gap:12px;border-top:2px solid #14171C;padding-top:14px">
+          <div style="width:60px;flex:none">
+            <svg viewBox="0 0 150 132" style="width:60px;height:53px;display:block;overflow:visible">
+              <path d="M6 120 C4 100 26 88 44 94 C54 78 96 78 106 94 C126 88 146 100 144 120 Z" fill="#E3CBA4" stroke="#14171C" stroke-width="3.8" stroke-linejoin="round"></path>
+              <path d="M34 108 C28 58 48 30 75 30 C102 30 122 58 116 108 Z" fill="#7A5A44" stroke="#14171C" stroke-width="3.8" stroke-linejoin="round"></path>
+              <g stroke="#14171C" stroke-width="2.8" stroke-linecap="round" fill="none">
+                <path d="M40 80 L14 74 M40 88 L12 88 M110 80 L136 74 M110 88 L138 88"></path>
+                <path d="M46 46 C58 30 92 30 104 46" stroke-width="3.2"></path>
+              </g>
+              <circle cx="75" cy="28" r="10" fill="#C8871F" stroke="#14171C" stroke-width="3.2"></circle>
+              <circle cx="75" cy="28" r="3.4" fill="#F5F6F3"></circle>
+              <g fill="none" stroke="#14171C" stroke-width="3">
+                <circle cx="60" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+                <circle cx="90" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+                <path d="M71 70 h8"></path>
+              </g>
+              <ellipse cx="60" cy="72" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+              <ellipse cx="90" cy="72" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+              <circle cx="67" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.8"></circle>
+              <circle cx="83" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.8"></circle>
+              <ellipse cx="75" cy="85" rx="6" ry="4.6" fill="#9E3524" stroke="#14171C" stroke-width="2.6"></ellipse>
+            </svg>
+          </div>
+          <div style="flex:1;position:relative;background:#E9EBE6;border:2px solid #14171C;border-radius:10px;padding:11px 14px">
+            <span style="font-size:13.5px;font-weight:600;line-height:1.5">{{ setupCody }}</span>
+            <div style="position:absolute;left:-9px;bottom:12px;width:14px;height:14px;background:#E9EBE6;border-left:2px solid #14171C;border-bottom:2px solid #14171C;transform:rotate(45deg)"></div>
+          </div>
+          <button onClick="{{ closeSetup }}" style="height:38px;padding:0 18px;border:2px solid #14171C;border-radius:6px;background:#14171C;color:#F5F6F3;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;flex:none">저장하고 닫기</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1560}}">
+const C = { hard:"#9E3524", soft:"#C8871F", neu:"#2FA97F", hold:"#8A9086" };
+const LABEL = { hard:"마지노선", soft:"협상 여지", neu:"신규·미확정", hold:"사람 확인" };
+
+const R = (id, name, kind, sub) => ({ id, name, kind, sub });
+
+const GROUPS = [
+  { id:"info", name:"정보통제", subs:["비밀유지","목적 외 이용","데이터 활용"], rules:[
+    R("R-003","비밀유지 기간은 3년을 넘기지 않는다","soft","비밀유지"),
+    R("R-031","목적 외 이용은 전면 금지로 시작한다","hard","목적 외 이용"),
+    R("R-019","AI 학습 데이터 이용은 기본 불허","neu","데이터 활용")
+  ]},
+  { id:"risk", name:"책임·분쟁", subs:["손해배상","면책","관할"], rules:[
+    R("R-014","배상 상한은 계약 총액 이내로 묶는다","hard","손해배상"),
+    R("R-007","준거법은 대한민국 법으로 고정한다","hard","관할"),
+    R("R-011","분쟁은 서울중앙지법 전속 관할","soft","관할")
+  ]},
+  { id:"proc", name:"절차·기한", subs:["통지","갱신"], rules:[
+    R("R-042","통지는 서면 30일 전으로 맞춘다","soft","통지"),
+    R("R-048","자동 갱신은 넣지 않는다","soft","갱신")
+  ]},
+  { id:"reg", name:"규제 대응", subs:["개인정보","공정거래"], rules:[
+    R("R-070","국외 이전은 사전 동의 확보 후 진행","hard","개인정보")
+  ]},
+  { id:"general", name:"계약 일반", subs:["서명","수정"], rules:[
+    R("R-081","전자서명은 표준 도구만 사용","soft","서명")
+  ]},
+  { id:"tech", name:"신기술 · AI", subs:["모델 학습","생성물 권리","경업"], rules:[
+    R("R-022","경업 금지 — 팀 판단이 갈림","hold","경업"),
+    R("R-055","모델 재학습 범위 — 기준 없음","hold","모델 학습"),
+    R("R-061","생성물 저작권 귀속 — 기준 없음","hold","생성물 권리")
+  ]}
+];
+
+const DETAIL = {
+  "R-014": {
+    short:"배상 상한", title:"배상 상한은 계약 총액 이내로 묶는다",
+    credit:"김변호사가 · SK케미칼–한국콜마 위수탁계약에서 · 2026-08-02 추출",
+    badge:"관철 30 / 30", badgeNote:"양보 0 — 서명본 30건 전부 이 선을 지켰습니다.",
+    summary:"손해배상 총액은 해당 계약의 총 대금을 넘지 않도록 상한을 명시합니다. 무제한 배상 조항은 수용하지 않고, 상대가 요구하면 보험 부보로 대체 제안합니다.",
+    recheck:"마지막 검토 2026-07-28 · 상법 개정 감시 중 · 재검토 대기 없음",
+    related:["면책 요건","배상 예정액","보험 부보"]
+  },
+  "R-055": {
+    short:"모델 재학습 범위", title:"모델 재학습 범위 — 아직 팀 기준이 없습니다",
+    credit:"이변호사가 · 사내 인터뷰 3건에서 · 2026-07-22 추출",
+    badge:"사례 3건", badgeNote:"모두 개별 판단으로 처리 — 반복 패턴이 아직 없습니다.",
+    summary:"수탁사가 우리 데이터를 모델 재학습에 쓸 수 있는 범위를 정한 판단이 없습니다. 지금까지 3건은 각각 다르게 합의했고, 어느 쪽도 표준으로 굳지 않았습니다.",
+    holdNote:"3건 중 2건은 전면 금지, 1건은 익명화 후 허용으로 처리했습니다. 담당자를 정해 한 줄로 확정해야 합니다.",
+    recheck:"기준 확정 전까지 매 건 사람 검토 필요",
+    related:["AI 학습 데이터 이용","생성물 저작권 귀속"]
+  },
+  "R-003": {
+    short:"비밀유지 기간", title:"비밀유지 기간은 3년을 넘기지 않는다",
+    credit:"박변호사가 · 표준 NDA 24건 비교에서 · 2026-06-11 추출",
+    badge:"관철 18 / 24", badgeNote:"양보 6 — 상대가 5년을 강하게 요구할 때 협상 카드로 썼습니다.",
+    summary:"비밀유지 의무 기간은 계약 종료 후 3년을 기준으로 합니다. 기술 정보가 핵심인 건에서는 5년까지 수용한 이력이 있습니다.",
+    recheck:"마지막 검토 2026-06-30 · 재검토 대기 없음",
+    related:["목적 외 이용","AI 학습 데이터 이용"]
+  }
+};
+
+const CHAT = [
+  { role:"user", text:"상대가 배상 무제한을 요구했는데 받아도 될까요?" },
+  { role:"ai", text:"안 됩니다. 우리 기준은 배상 상한을 계약 총액 이내로 묶는 것이고, 서명본 30건 전부 이 선을 지켰습니다.",
+    sources:[{ id:"R-014", name:"배상 상한", kind:"hard", credit:"김변호사, 3월" }] },
+  { role:"user", text:"수탁사가 우리 데이터로 모델 재학습해도 되나요?" },
+  { role:"ai", text:"우리 판단 중에 확정된 기준이 없습니다. 사례 3건이 서로 달라서 제가 정하지 않고 넘기겠습니다.",
+    noBasis:true, sources:[{ id:"R-055", name:"모델 재학습 범위", kind:"hold", credit:"이변호사, 7월" }] }
+];
+
+const PRESET = ["정보통제","책임·분쟁","절차·기한","규제 대응","계약 일반","분쟁 해결"];
+
+class Component extends DCLogic {
+  state = { open: {}, rule: "R-014", setup: false, categories: true, rules: true, preset: false };
+
+  pick(id) {
+    const g = GROUPS.find(x => x.rules.some(r => r.id === id));
+    this.setState(s => ({ rule: id, open: { ...s.open, [g.id]: true }, setup: false }));
+  }
+
+  renderVals() {
+    const st = this.state;
+    const hasCategory = st.categories;
+    const hasRules = st.categories && st.rules;
+    const total = hasRules ? GROUPS.reduce((n, g) => n + g.rules.length, 0) : 0;
+    const detail = DETAIL[st.rule] || DETAIL["R-014"];
+    const flatRule = GROUPS.flatMap(g => g.rules.map(r => ({ ...r, group: g.name }))).find(r => r.id === st.rule) || {};
+
+    const toc = hasCategory ? GROUPS.map((g, i) => {
+      const open = !!st.open[g.id];
+      const holds = g.rules.filter(r => r.kind === "hold").length;
+      return {
+        n: i + 1, name: g.name, open,
+        caret: open ? "▾" : "▸",
+        headBg: open ? "#14171C" : "#F5F6F3",
+        headFg: open ? "#F5F6F3" : "#14171C",
+        blind: holds > 0 && holds >= Math.ceil(g.rules.length / 2),
+        count: hasRules ? g.rules.length + "개" : "0개",
+        toggle: () => this.setState(s => ({ open: { ...s.open, [g.id]: !open } })),
+        items: hasRules ? g.rules.map(r => ({
+          name: r.name,
+          dot: r.kind === "hold" ? "transparent" : C[r.kind],
+          dotStyle: r.kind === "hold" ? "dashed" : "solid",
+          bg: r.id === st.rule ? "rgba(200,135,31,.16)" : "#FFFFFF",
+          weight: r.id === st.rule ? "700" : "500",
+          open: () => this.pick(r.id)
+        })) : []
+      };
+    }) : [];
+
+    return {
+      stateHint: hasCategory ? (hasRules ? "카테고리 6개 · 규칙 " + total + "개" : "카테고리 준비됨 · 규칙 0개") : "카테고리 미설정",
+      viewToggles: [
+        { key:"full", label:"보통" }, { key:"norules", label:"규칙 없음" }, { key:"nocat", label:"카테고리 없음" }
+      ].map(v => {
+        const active = v.key === (hasCategory ? (hasRules ? "full" : "norules") : "nocat");
+        return {
+          label: v.label,
+          bg: active ? "#F5F6F3" : "transparent",
+          fg: active ? "#14171C" : "#E9EBE6",
+          go: () => this.setState({
+            categories: v.key !== "nocat",
+            rules: v.key === "full",
+            setup: false,
+            preset: v.key === "full"
+          })
+        };
+      }),
+      total: String(total),
+      noCategory: !hasCategory,
+      hasCategory,
+      noRules: hasCategory && !hasRules,
+      hasRule: hasRules,
+      toc,
+      rule: {
+        group: flatRule.group || "", sub: flatRule.sub || "",
+        short: detail.short, title: detail.title, credit: detail.credit,
+        strength: LABEL[flatRule.kind] || "", color: C[flatRule.kind] || C.hold,
+        fg: flatRule.kind === "hard" ? "#F5F6F3" : "#14171C",
+        badge: detail.badge, badgeNote: detail.badgeNote, summary: detail.summary,
+        isHold: flatRule.kind === "hold", holdNote: detail.holdNote || "",
+        recheck: detail.recheck,
+        related: (detail.related || []).map(name => {
+          const hit = GROUPS.flatMap(g => g.rules).find(r => r.name.indexOf(name) === 0 || name.indexOf(r.name.slice(0, 4)) === 0);
+          return { name, go: () => hit ? this.pick(hit.id) : null };
+        })
+      },
+      chat: CHAT.map(m => ({
+        text: m.text,
+        align: m.role === "user" ? "flex-end" : "flex-start",
+        bg: m.role === "user" ? "#FFFFFF" : "#E9EBE6",
+        borderStyle: "solid",
+        borderColor: m.role === "user" ? "#8A9086" : "#14171C",
+        weight: m.role === "user" ? "600" : "500",
+        hasSource: !!m.sources,
+        noBasis: !!m.noBasis,
+        sources: (m.sources || []).map(s => ({
+          name: s.name, credit: s.credit, color: C[s.kind], go: () => this.pick(s.id)
+        }))
+      })),
+      codyLine: hasRules
+        ? "근거가 있는 것만 답해요. 없으면 없다고 말할게요 🔦"
+        : "카테고리부터 정하면 제가 그 안에 판단을 채워둘게요.",
+      openSetup: () => this.setState({ setup: true }),
+      closeSetup: () => this.setState({ setup: false }),
+      setupOpen: st.setup,
+      setupEmpty: st.setup && !st.preset,
+      setupHasList: st.setup && st.preset,
+      loadPreset: () => this.setState({ preset: true, categories: true }),
+      setupList: st.preset ? GROUPS.map((g, i) => ({
+        n: i + 1, name: g.name, subs: g.subs.map(s => ({ name: s }))
+      })) : [],
+      setupCody: st.preset
+        ? "여섯 개로 정리해뒀어요. 이름은 팀 말투로 바꾸셔도 돼요."
+        : "기본 여섯 개부터 시작하는 게 편해요. 나중에 바꿀 수 있어요.",
+      noop: () => {}
+    };
+  }
+}
+
+</script>
+</body>
+</html>

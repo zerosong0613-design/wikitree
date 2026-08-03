@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "CODEX Mining Tool — 계약 서명본에서 반복되는 판단 규칙을 Claude로 채굴해 CODEX 서랍에 쌓는 로컬 웹 도구",
+  "description": "CODEX 판단 위키 — 계약·자문·회의·사고에서 나온 팀의 판단을 누가·언제·왜 정했는지까지 남겨, 판단·원천·의뢰부서·주제 축으로 쌓고 꺼내는 로컬 웹 앱",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+html,body{margin:0;padding:0;background:#E9EBE6;font-family:Pretendard,system-ui,sans-serif;color:#14171C}
+a{color:#9E3524}a:hover{color:#14171C}
+@keyframes cx-snap{0%{transform:translateY(-14px) scale(.96);opacity:0}60%{transform:translateY(3px) scale(1.01);opacity:1}100%{transform:translateY(0) scale(1);opacity:1}}
+@keyframes cx-rise{0%{transform:translateY(16px);opacity:0}100%{transform:translateY(0);opacity:1}}
+@keyframes cx-dig{0%{transform:rotate(-6deg)}50%{transform:rotate(14deg)}100%{transform:rotate(-6deg)}}
+@keyframes cx-beam{0%{opacity:.55}50%{opacity:.85}100%{opacity:.55}}
+@keyframes cx-drop{0%{transform:translateY(-26px);opacity:0}70%{transform:translateY(2px);opacity:1}100%{transform:translateY(0)}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;justify-content:center;padding:28px 20px 40px;background:#E9EBE6">
+<div style="width:1400px;max-width:100%;display:flex;flex-direction:column;gap:16px">
+
+  <header style="display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #14171C;padding-bottom:12px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#4B534A">CODEX / clause mining</span>
+      <h1 style="margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em">계약에서 판단을 캐다</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#4B534A">frame</span>
+      <sc-for list="{{ steps }}" as="s" hint-placeholder-count="6">
+        <button onClick="{{ s.go }}" style="width:34px;height:34px;border:2px solid #14171C;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;cursor:pointer;background:{{ s.bg }};color:{{ s.fg }}">{{ s.n }}</button>
+      </sc-for>
+      <button onClick="{{ togglePlay }}" style="margin-left:8px;height:34px;padding:0 14px;border:2px solid #14171C;border-radius:6px;background:#F5F6F3;color:#14171C;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;cursor:pointer">{{ playLabel }}</button>
+    </div>
+  </header>
+
+  <sc-if value="{{ isStandard }}" hint-placeholder-val="{{ true }}">
+  <div style="display:grid;grid-template-columns:25% 45% 30%;gap:14px;align-items:stretch;min-height:640px">
+
+    <section style="background:#F5F6F3;border:2px solid #14171C;border-radius:4px;padding:18px 16px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#4B534A">ore pile / signed NDA</span>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:64px;font-weight:600;line-height:.9;letter-spacing:-.03em">{{ oreLeft }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#4B534A">/ 30</span>
+        </div>
+        <span style="font-size:12px;color:#4B534A">남은 원석</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column-reverse;gap:3px;justify-content:flex-start">
+        <sc-for list="{{ orePile }}" as="o" hint-placeholder-count="12">
+          <div style="height:{{ o.h }};border-radius:2px;border-style:{{ o.bs }};border-width:{{ o.bw }};border-color:{{ o.bc }};background:{{ o.bg }};opacity:{{ o.op }};transition:opacity 320ms cubic-bezier(.2,.8,.3,1),background 320ms cubic-bezier(.2,.8,.3,1)"></div>
+        </sc-for>
+      </div>
+      <div style="border-top:2px solid #14171C;padding-top:10px;display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#4B534A">
+        <span>MINED</span><span style="color:#14171C;font-weight:600">{{ minedCount }}</span>
+      </div>
+    </section>
+
+    <section style="background:#F5F6F3;border:2px solid #14171C;border-radius:4px;padding:18px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#4B534A">mining floor</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;color:#14171C;white-space:nowrap;flex:none">{{ inspectLabel }}</span>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px;border:2px dashed #8A9086;border-radius:4px;background:#E9EBE6;animation:cx-drop 320ms cubic-bezier(.2,.8,.3,1)">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;color:#4B534A">검사 중</span>
+          <span style="font-size:16px;font-weight:700;flex:1">{{ inspecting.name }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#4B534A">{{ inspecting.badge }}</span>
+        </div>
+
+        <sc-for list="{{ classified }}" as="c" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:12px;padding:13px 14px 13px 0;border:2px solid #14171C;border-radius:4px;background:{{ c.tint }};animation:cx-rise 320ms cubic-bezier(.2,.8,.3,1);border-style:{{ c.borderStyle }}">
+            <div style="width:10px;align-self:stretch;background:{{ c.color }};margin-right:2px"></div>
+            <span style="font-size:16px;font-weight:700;flex:1">{{ c.name }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;padding:3px 8px;border:2px solid {{ c.color }};border-radius:3px;color:{{ c.color }};margin-right:14px">{{ c.badge }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="margin-top:auto;display:flex;align-items:flex-end;gap:14px">
+        <div style="width:132px;flex:none;animation:{{ codyAnim }}">
+          <svg viewBox="0 0 150 132" style="width:152px;height:134px;display:block;overflow:visible">
+            <path d="M6 120 C4 100 26 88 44 94 C54 78 96 78 106 94 C126 88 146 100 144 120 Z" fill="#E3CBA4" stroke="#14171C" stroke-width="3.4" stroke-linejoin="round"></path>
+            <path d="M34 108 C28 58 48 30 75 30 C102 30 122 58 116 108 Z" fill="#7A5A44" stroke="#14171C" stroke-width="3.4" stroke-linejoin="round"></path>
+            <g stroke="#14171C" stroke-width="2.4" stroke-linecap="round" fill="none">
+              <path d="M40 80 L14 74 M40 88 L12 88 M42 96 L16 102"></path>
+              <path d="M110 80 L136 74 M110 88 L138 88 M108 96 L134 102"></path>
+            </g>
+            <g stroke="#14171C" stroke-width="3" stroke-linecap="round" fill="none">
+              <path d="M46 46 C58 30 92 30 104 46"></path>
+            </g>
+            <circle cx="75" cy="28" r="10" fill="#C8871F" stroke="#14171C" stroke-width="3"></circle>
+            <circle cx="75" cy="28" r="3.4" fill="#F5F6F3" stroke="none"></circle>
+            <g fill="none" stroke="#14171C" stroke-width="2.6">
+              <circle cx="60" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+              <circle cx="90" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+              <path d="M71 70 h8"></path>
+            </g>
+            <ellipse cx="60" cy="70" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+            <ellipse cx="90" cy="70" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+            <circle cx="67" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.6"></circle>
+            <circle cx="83" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.6"></circle>
+            <ellipse cx="75" cy="85" rx="6" ry="4.6" fill="#9E3524" stroke="#14171C" stroke-width="2.4"></ellipse>
+            <path d="M40 100 C30 100 26 112 34 120 C42 124 52 118 52 110 Z" fill="#6B4C39" stroke="#14171C" stroke-width="3.2" stroke-linejoin="round"></path>
+            <path d="M110 100 C120 100 124 112 116 120 C108 124 98 118 98 110 Z" fill="#6B4C39" stroke="#14171C" stroke-width="3.2" stroke-linejoin="round"></path>
+            <g stroke="#14171C" stroke-width="2" stroke-linecap="round" fill="none">
+              <path d="M36 112 v6 M43 111 v7 M114 112 v6 M107 111 v7"></path>
+            </g>
+            <g style="transform-origin:116px 108px;animation:{{ pickAnim }}">
+              <path d="M116 108 L132 66" stroke="#7A5A44" stroke-width="5" stroke-linecap="round" fill="none"></path>
+              <path d="M116 108 L132 66" stroke="#14171C" stroke-width="2" stroke-linecap="round" fill="none" opacity=".35"></path>
+              <path d="M123 66 q10 -9 18 4" stroke="#14171C" stroke-width="3.4" stroke-linecap="round" fill="#C8871F"></path>
+            </g>
+            <g stroke="#14171C" stroke-width="2.4" stroke-linecap="round" fill="none">
+              <path d="M44 18 l-5 -8 M75 12 v-9 M106 18 l5 -8"></path>
+            </g>
+            <sc-if value="{{ cody.sweat }}" hint-placeholder-val="{{ false }}">
+              <path d="M116 44 q5 8 0 12 q-6 -4 0 -12" fill="#2FA97F" stroke="#14171C" stroke-width="2"></path>
+            </sc-if>
+            <sc-if value="{{ cody.question }}" hint-placeholder-val="{{ false }}">
+              <text x="120" y="34" font-family="IBM Plex Mono, monospace" font-size="26" font-weight="600" fill="#8A9086">?</text>
+            </sc-if>
+          </svg>
+        </div>
+        <div style="flex:1;position:relative;background:#E9EBE6;border:2px solid #14171C;border-radius:10px;padding:14px 16px;margin-bottom:22px">
+          <span style="font-size:16px;font-weight:600;line-height:1.5">{{ cody.line }}</span>
+          <div style="position:absolute;left:-9px;bottom:14px;width:14px;height:14px;background:#E9EBE6;border-left:2px solid #14171C;border-bottom:2px solid #14171C;transform:rotate(45deg)"></div>
+        </div>
+      </div>
+    </section>
+
+    <section style="background:#F5F6F3;border:2px solid #14171C;border-radius:4px;padding:18px 16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #14171C;padding-bottom:10px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#4B534A">codex drawer</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:600">{{ ruleCount }}</span>
+      </div>
+      <p style="margin:-4px 0 2px;font-size:11.5px;line-height:1.5;color:#4B534A;text-wrap:pretty">숫자 = 30건 서명본 중 우리 표준안이 관철된 건수. 한 번도 안 내줬으면 마지노선, 양보 이력이 있으면 협상 여지.</p>
+      <sc-if value="{{ codexEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center;align-items:center;border:2px dashed #8A9086;border-radius:6px;color:#8A9086">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase">empty</span>
+          <span style="font-size:13px">아직 캐낸 규칙이 없어요</span>
+        </div>
+      </sc-if>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ codex }}" as="r" hint-placeholder-count="0">
+          <div style="border:2px solid #14171C;border-radius:9px;padding:12px 13px;background:#FFFFFF;display:flex;flex-direction:column;gap:9px;animation:cx-snap 320ms cubic-bezier(.2,.8,.3,1);border-style:{{ r.borderStyle }};box-shadow:{{ r.glow }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8A9086">{{ r.id }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;color:#8A9086;border:1px solid #8A9086;border-radius:2px;padding:1px 5px;white-space:nowrap;flex:none">{{ r.origin }}</span>
+            </div>
+            <span style="font-size:15px;font-weight:700;line-height:1.4;text-wrap:pretty">{{ r.judgment }}</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span style="font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:3px 8px;border-radius:3px;background:{{ r.color }};color:{{ r.fg }};white-space:nowrap;flex:none">{{ r.strength }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#4B534A;white-space:nowrap;flex:none">{{ r.ratio }}</span>
+            </div>
+            <span style="font-size:11.5px;line-height:1.45;color:#4B534A;margin-top:-3px;text-wrap:pretty">{{ r.note }}</span>
+            <div style="display:flex;gap:3px;align-items:stretch;height:12px">
+              <sc-for list="{{ r.meter }}" as="m" hint-placeholder-count="10">
+                <div style="flex:1;border:1.5px solid #14171C;border-radius:1px;background:{{ m.bg }};border-right-style:{{ m.rs }};border-right-width:{{ m.rw }}"></div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isClimax }}" hint-placeholder-val="{{ false }}">
+  <div style="position:relative;min-height:640px;background:#F5F6F3;border:2px solid #14171C;border-radius:4px;overflow:hidden;display:flex;flex-direction:column;padding:34px 40px">
+    <div style="position:absolute;left:50%;bottom:118px;width:760px;height:430px;transform:translateX(-50%);background:radial-gradient(ellipse at 50% 100%, rgba(200,135,31,.34), rgba(200,135,31,0) 68%);animation:cx-beam 2s ease-in-out infinite"></div>
+
+    <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:26px;margin-top:8px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:#4B534A">crystallized · rule-014</span>
+      <div style="display:flex;align-items:center;gap:18px;padding:22px 26px 22px 0;border:2px solid #9E3524;border-radius:6px;background:rgba(158,53,36,.10);box-shadow:0 0 0 8px rgba(200,135,31,.16)">
+        <div style="width:14px;align-self:stretch;background:#9E3524"></div>
+        <span style="font-size:34px;font-weight:800;letter-spacing:-.02em">배상 상한</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;padding:6px 12px;border:2px solid #9E3524;border-radius:4px;color:#9E3524;white-space:nowrap;flex:none">30 / 30 · 한 번도 안 바뀜</span>
+      </div>
+      <h2 style="margin:6px 0 0;max-width:1000px;text-align:center;font-size:56px;line-height:1.28;font-weight:800;letter-spacing:-.03em;text-wrap:pretty">아무도 안 적어놨지만,<br>팀은 이미 이렇게 판단하고 있었어요.</h2>
+      <div style="border:2px solid #14171C;border-radius:9px;background:#FFFFFF;padding:14px 18px;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#8A9086;white-space:nowrap;flex:none">RULE-014</span>
+          <span style="font-size:16px;font-weight:700">마지노선 (자동 발견) — 배상 상한은 계약 총액 이내</span>
+          <span style="font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:3px;background:#9E3524;color:#F5F6F3;white-space:nowrap;flex:none">마지노선</span>
+        </div>
+        <span style="font-size:13px;color:#4B534A">30건 전부 관철 · 양보 0 — 그래서 마지노선.</span>
+      </div>
+    </div>
+
+    <div style="position:relative;margin-top:auto;display:flex;align-items:flex-end;gap:14px">
+      <div style="width:92px;flex:none">
+        <svg viewBox="0 0 150 132" style="width:120px;height:106px;display:block;overflow:visible">
+          <path d="M6 120 C4 100 26 88 44 94 C54 78 96 78 106 94 C126 88 146 100 144 120 Z" fill="#E3CBA4" stroke="#14171C" stroke-width="3.4" stroke-linejoin="round"></path>
+          <path d="M34 108 C28 58 48 30 75 30 C102 30 122 58 116 108 Z" fill="#7A5A44" stroke="#14171C" stroke-width="3.4" stroke-linejoin="round"></path>
+          <g stroke="#14171C" stroke-width="2.4" stroke-linecap="round" fill="none">
+            <path d="M40 80 L14 74 M40 88 L12 88 M42 96 L16 102"></path>
+            <path d="M110 80 L136 74 M110 88 L138 88 M108 96 L134 102"></path>
+            <path d="M46 44 C58 28 92 28 104 44" stroke-width="3"></path>
+          </g>
+          <circle cx="75" cy="26" r="11" fill="#C8871F" stroke="#14171C" stroke-width="3"></circle>
+          <circle cx="75" cy="26" r="4" fill="#F5F6F3"></circle>
+          <g fill="none" stroke="#14171C" stroke-width="2.6">
+            <circle cx="60" cy="68" r="11" fill="rgba(245,246,243,.28)"></circle>
+            <circle cx="90" cy="68" r="11" fill="rgba(245,246,243,.28)"></circle>
+            <path d="M71 68 h8"></path>
+          </g>
+          <ellipse cx="60" cy="65" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+          <ellipse cx="90" cy="65" rx="3.4" ry="4.6" fill="#14171C"></ellipse>
+          <circle cx="67" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.6"></circle>
+          <circle cx="83" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.6"></circle>
+          <ellipse cx="75" cy="85" rx="6" ry="4.6" fill="#9E3524" stroke="#14171C" stroke-width="2.4"></ellipse>
+          <path d="M40 100 C30 100 26 112 34 120 C42 124 52 118 52 110 Z" fill="#6B4C39" stroke="#14171C" stroke-width="3.2" stroke-linejoin="round"></path>
+          <path d="M110 100 C120 100 124 112 116 120 C108 124 98 118 98 110 Z" fill="#6B4C39" stroke="#14171C" stroke-width="3.2" stroke-linejoin="round"></path>
+        </svg>
+      </div>
+      <div style="position:relative;background:#E9EBE6;border:2px solid #14171C;border-radius:10px;padding:12px 16px;margin-bottom:16px">
+        <span style="font-size:15px;font-weight:600">여기, 램프 비춰볼게요. 30건 전부 이 선을 지켰어요 🔦</span>
+        <div style="position:absolute;left:-9px;bottom:12px;width:14px;height:14px;background:#E9EBE6;border-left:2px solid #14171C;border-bottom:2px solid #14171C;transform:rotate(45deg)"></div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isSummary }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height:640px;background:#F5F6F3;border:2px solid #14171C;border-radius:4px;padding:40px 44px;display:flex;flex-direction:column;gap:34px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:2px solid #14171C;padding-bottom:14px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:#4B534A">codex · run summary</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;color:#4B534A;white-space:nowrap;flex:none">signed NDA 30건</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px">
+      <div style="border:2px solid #14171C;border-radius:4px;background:#FFFFFF;padding:26px 24px;display:flex;flex-direction:column;gap:10px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#4B534A">candidates → confirmed</span>
+        <div style="display:flex;align-items:baseline;gap:12px;white-space:nowrap">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:76px;font-weight:600;line-height:.86;letter-spacing:-.04em;flex:none">47</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:30px;flex:none">→</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:76px;font-weight:600;line-height:.86;letter-spacing:-.04em;color:#9E3524;flex:none">6</span>
+        </div>
+        <span style="font-size:15px;font-weight:600;text-wrap:pretty">30건에서 후보 47개 추출 · 대표 6개 확정 시연</span>
+      </div>
+      <div style="border:2px dashed #8A9086;border-radius:4px;background:#FFFFFF;padding:26px 24px;display:flex;flex-direction:column;gap:10px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#4B534A">needs human</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:92px;font-weight:600;line-height:.86;letter-spacing:-.04em;color:#8A9086">6</span>
+        <span style="font-size:15px;font-weight:600">사람 확인 필요</span>
+      </div>
+      <div style="border:2px solid #14171C;border-radius:4px;background:#FFFFFF;padding:26px 24px;display:flex;flex-direction:column;gap:10px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#4B534A">review lead time</span>
+        <div style="display:flex;align-items:baseline;gap:12px;white-space:nowrap">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:44px;font-weight:600;letter-spacing:-.03em;color:#8A9086;text-decoration:line-through;white-space:nowrap;flex:none">3일</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:34px;flex:none">→</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:66px;font-weight:600;letter-spacing:-.03em;color:#2FA97F;line-height:.9;white-space:nowrap;flex:none">20분</span>
+        </div>
+        <span style="font-size:15px;font-weight:600">검토 리드타임</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#4B534A">distribution</span>
+      <div style="display:flex;height:44px;border:2px solid #14171C;border-radius:4px;overflow:hidden">
+        <div style="flex:18;background:#9E3524;display:flex;align-items:center;justify-content:center;color:#F5F6F3;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em">HARD 18</div>
+        <div style="flex:21;background:#C8871F;border-left:2px solid #14171C;display:flex;align-items:center;justify-content:center;color:#14171C;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em">SOFT 21</div>
+        <div style="flex:8;background:#2FA97F;border-left:2px solid #14171C;display:flex;align-items:center;justify-content:center;color:#14171C;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.14em">DEFAULT 8</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:stretch">
+      <div style="border:2px solid #2FA97F;border-radius:9px;background:#FFFFFF;padding:16px 18px;display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#4B534A">freshest find · rule-019</span>
+        <span style="font-size:16px;font-weight:700;text-wrap:pretty">AI 학습 데이터 이용은 기본 불허로 시작한다</span>
+        <span style="font-size:12.5px;color:#4B534A">우리가 캔 것 중 가장 최신 판단 · 등장 7건, 아직 표본 부족</span>
+      </div>
+      <div style="border:2px solid #14171C;border-radius:9px;background:#FFFFFF;padding:16px 18px;display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#4B534A">radar · keeps codex fresh</span>
+        <span style="font-size:14px;line-height:1.55;text-wrap:pretty">상법·개인정보법이 개정되면 RADAR가 이 규칙들을 자동으로 <strong>‘재검토’ 상태</strong>로 올린다 — RADAR가 CODEX를 신선하게 유지한다.</span>
+      </div>
+    </div>
+
+    <div style="margin-top:auto;display:flex;align-items:flex-end;gap:16px">
+      <div style="width:118px;flex:none">
+        <svg viewBox="0 0 150 132" style="width:140px;height:124px;display:block;overflow:visible">
+          <path d="M6 120 C4 100 26 88 44 94 C54 78 96 78 106 94 C126 88 146 100 144 120 Z" fill="#E3CBA4" stroke="#14171C" stroke-width="3.4" stroke-linejoin="round"></path>
+          <path d="M34 108 C28 58 48 30 75 30 C102 30 122 58 116 108 Z" fill="#7A5A44" stroke="#14171C" stroke-width="3.4" stroke-linejoin="round"></path>
+          <g stroke="#14171C" stroke-width="2.4" stroke-linecap="round" fill="none">
+            <path d="M40 80 L14 74 M40 88 L12 88 M42 96 L16 102"></path>
+            <path d="M110 80 L136 74 M110 88 L138 88"></path>
+            <path d="M46 46 C58 30 92 30 104 46" stroke-width="3"></path>
+          </g>
+          <circle cx="75" cy="28" r="10" fill="#C8871F" stroke="#14171C" stroke-width="3"></circle>
+          <circle cx="75" cy="28" r="3.4" fill="#F5F6F3"></circle>
+          <g fill="none" stroke="#14171C" stroke-width="2.6">
+            <circle cx="60" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+            <circle cx="90" cy="70" r="11" fill="rgba(245,246,243,.28)"></circle>
+            <path d="M71 70 h8"></path>
+            <path d="M55 70 q5 -5 10 0 M85 70 q5 -5 10 0" stroke-width="2.4"></path>
+          </g>
+          <circle cx="67" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.6"></circle>
+          <circle cx="83" cy="94" r="9.5" fill="#F5F6F3" stroke="#14171C" stroke-width="2.6"></circle>
+          <ellipse cx="75" cy="85" rx="6" ry="4.6" fill="#9E3524" stroke="#14171C" stroke-width="2.4"></ellipse>
+          <path d="M40 100 C30 100 26 112 34 120 C42 124 52 118 52 110 Z" fill="#6B4C39" stroke="#14171C" stroke-width="3.2" stroke-linejoin="round"></path>
+          <g stroke="#14171C" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" fill="#6B4C39">
+            <path d="M112 104 C124 100 128 86 124 72"></path>
+            <path d="M124 68 l5 6 M124 68 l5 -4"></path>
+          </g>
+        </svg>
+      </div>
+      <div style="position:relative;background:#E9EBE6;border:2px solid #14171C;border-radius:10px;padding:13px 16px;margin-bottom:18px">
+        <span style="font-size:16px;font-weight:600">여기까지 캔 것들이에요. 6개는 제가 잘 모르겠어서 남겨뒀어요!</span>
+        <div style="position:absolute;left:-9px;bottom:13px;width:14px;height:14px;background:#E9EBE6;border-left:2px solid #14171C;border-bottom:2px solid #14171C;transform:rotate(45deg)"></div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <footer style="display:flex;align-items:center;justify-content:space-between;border-top:2px solid #14171C;padding-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#4B534A">
+    <span style="white-space:nowrap;flex:none">{{ frameTitle }}</span>
+    <span style="white-space:nowrap;flex:none">cody · mole docent</span>
+  </footer>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;autoplay&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;frameDuration&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:3.5,&quot;min&quot;:1.5,&quot;max&quot;:8,&quot;step&quot;:0.5,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;}}">
+const C = { hard:"#9E3524", soft:"#C8871F", neu:"#2FA97F", hold:"#8A9086" };
+const TINT = { hard:"rgba(158,53,36,.10)", soft:"rgba(200,135,31,.12)", neu:"rgba(47,169,127,.12)", hold:"rgba(138,144,134,.12)" };
+
+function meter(filled, muddy) {
+  const cells = [];
+  for (let i = 0; i < 10; i++) {
+    cells.push({
+      bg: i < filled ? (muddy ? "#8A9086" : "#14171C") : "#E9EBE6",
+      rs: i === 5 ? "dashed" : "solid",
+      rw: i === 5 ? "2px" : "1.5px"
+    });
+  }
+  return cells;
+}
+
+const RULES = [
+  { id:"RULE-003", judgment:"비밀유지 기간은 3년을 넘기지 않는다", strength:"협상 여지", kind:"soft", badge:"관철 18/24", note:"양보 6 · 협상 카드로 쓴 이력", origin:"diff 채굴", filled:7 },
+  { id:"RULE-007", judgment:"준거법은 대한민국 법으로 고정한다", strength:"마지노선", kind:"hard", badge:"관철 26/28", note:"양보 2 · 외국계 상대만 예외", origin:"diff 채굴", filled:9 },
+  { id:"RULE-011", judgment:"분쟁은 서울중앙지법 전속 관할로 둔다", strength:"협상 여지", kind:"soft", badge:"관철 15/22", note:"양보 7 · 상대 본사 소재지로 종종 양보", origin:"diff 채굴", filled:7 },
+  { id:"RULE-014", judgment:"배상 상한은 계약 총액 이내로 묶는다", strength:"마지노선", kind:"hard", badge:"관철 30/30", note:"양보 0 · 한 번도 안 내줌", origin:"diff 채굴", filled:10 },
+  { id:"RULE-019", judgment:"AI 학습 데이터 이용은 기본 불허로 시작한다", strength:"신규·미확정", kind:"neu", badge:"등장 7건", note:"표본 부족 · 최근 등장한 신규 쟁점", origin:"인터뷰 채굴", filled:5 },
+  { id:"RULE-022", judgment:"경업 금지 — 팀 판단이 갈림", strength:"사람 확인", kind:"hold", badge:"14 : 16 갈림", note:"우리안 14 / 상대안 16 · 팀 합의 없음", origin:"사례 역추출", filled:4, muddy:true }
+];
+
+const FRAMES = [
+  { title:"01 · 시작 — 원석 30, CODEX 텅 빔", ore:30, mined:0,
+    inspecting:{ name:"조항 스캔 대기", badge:"— / 30" }, classified:[], rules:0,
+    cody:{ line:"자, 30건 파러 가볼까요? 곡괭이 챙겼어요.", anim:"none", pick:"none" } },
+  { title:"02 · 채굴 중 — 색이 배정된다", ore:22, mined:8,
+    inspecting:{ name:"분쟁 해결", badge:"22 / 30" },
+    classified:[ {n:"준거법", b:"관철 26/28", k:"hard"}, {n:"비밀유지 기간", b:"관철 18/24", k:"soft"}, {n:"AI 학습 데이터 이용", b:"등장 7건", k:"neu"} ],
+    rules:2, cody:{ line:"같은 판단이 반복되면 색이 붙어요. 지금 8건째예요!", anim:"cx-dig 900ms ease-in-out infinite", pick:"cx-dig 900ms ease-in-out infinite", sweat:true } },
+  { title:"03 · 결정화 — CODEX에 카드가 꽂힌다", ore:12, mined:18,
+    inspecting:{ name:"손해배상 범위", badge:"12 / 30" },
+    classified:[ {n:"분쟁 해결", b:"관철 15/22", k:"soft"}, {n:"준거법", b:"관철 26/28", k:"hard"}, {n:"비밀유지 기간", b:"관철 18/24", k:"soft"}, {n:"AI 학습 데이터 이용", b:"등장 7건", k:"neu"} ],
+    rules:4, cody:{ line:"이거, 30번 다 똑같았어요! 결정으로 굳혀둘게요 ✨", anim:"none", pick:"none" } },
+  { title:"04 · 클라이맥스 — 헤드램프", climax:true },
+  { title:"05 · 보류 — 사람 확인 큐", ore:3, mined:27,
+    inspecting:{ name:"경업 금지", badge:"14 / 30" },
+    classified:[ {n:"경업 금지", b:"14 : 16 갈림", k:"hold", dashed:true}, {n:"배상 상한", b:"관철 30/30", k:"hard"}, {n:"분쟁 해결", b:"관철 15/22", k:"soft"}, {n:"AI 학습 데이터 이용", b:"등장 7건", k:"neu"} ],
+    rules:6, cody:{ line:"이건 판단이 갈렸어요. 저도 잘 모르겠으니 사람이 봐주세요!", anim:"none", pick:"none", question:true } },
+  { title:"06 · 숫자 요약", summary:true }
+];
+
+class Component extends DCLogic {
+  state = { frame: 0, playing: false };
+
+  componentDidMount() { if (this.props.autoplay) this.start(); }
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  start() {
+    clearInterval(this.timer);
+    const ms = (this.props.frameDuration ?? 3.5) * 1000;
+    this.timer = setInterval(() => this.setState(s => ({ frame: (s.frame + 1) % 6 })), ms);
+    this.setState({ playing: true });
+  }
+  stop() { clearInterval(this.timer); this.setState({ playing: false }); }
+
+  renderVals() {
+    const i = this.state.frame;
+    const f = FRAMES[i];
+    const ore = f.ore ?? 0;
+    const pile = [];
+    for (let k = 0; k < 14; k++) {
+      const active = k < Math.round(ore / 30 * 14);
+      pile.push({
+        h: (10 + (k % 3) * 3) + "px",
+        bg: active ? "#14171C" : "transparent",
+        bc: active ? "#14171C" : "#8A9086",
+        bs: active ? "solid" : "dotted",
+        bw: active ? "2px" : "1px",
+        op: active ? "1" : ".22"
+      });
+    }
+    const classified = (f.classified || []).map(c => ({
+      name: c.n, badge: c.b, color: C[c.k], tint: TINT[c.k],
+      borderStyle: c.dashed ? "dashed" : "solid"
+    }));
+    const codex = RULES.slice(0, f.rules || 0).map((r, idx) => ({
+      id: r.id, judgment: r.judgment, strength: r.strength, ratio: r.badge, note: r.note, origin: r.origin,
+      color: C[r.kind], fg: r.kind === "hard" ? "#F5F6F3" : "#14171C", borderStyle: r.kind === "hold" ? "dashed" : "solid",
+      glow: idx === (f.rules || 0) - 1 ? "0 0 0 5px rgba(200,135,31,.20)" : "none",
+      meter: meter(r.filled, r.muddy)
+    })).reverse();
+
+    return {
+      steps: [0,1,2,3,4,5].map(n => ({
+        n: n + 1, bg: n === i ? "#14171C" : "#F5F6F3", fg: n === i ? "#F5F6F3" : "#14171C",
+        go: () => { this.stop(); this.setState({ frame: n }); }
+      })),
+      togglePlay: () => (this.state.playing ? this.stop() : this.start()),
+      playLabel: this.state.playing ? "pause" : "play",
+      frameTitle: f.title,
+      isStandard: !f.climax && !f.summary,
+      isClimax: !!f.climax,
+      isSummary: !!f.summary,
+      oreLeft: String(ore).padStart(2, "0"),
+      minedCount: String(f.mined ?? 30),
+      orePile: pile,
+      inspectLabel: (f.mined ?? 30) + " / 30 검사됨",
+      inspecting: f.inspecting || { name: "", badge: "" },
+      classified,
+      codex,
+      codexEmpty: codex.length === 0,
+      ruleCount: String(f.rules ?? 0).padStart(2, "0"),
+      cody: f.cody || {},
+      codyAnim: (f.cody && f.cody.anim) || "none",
+      pickAnim: (f.cody && f.cody.pick) || "none"
+    };
+  }
+}
+
+</script>
+</body>
+</html>

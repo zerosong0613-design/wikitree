@@ -1,12 +1,21 @@
+# 빌드 산출물 · 의존성
 node_modules/
 dist/
 dist-ssr/
 *.local
-.DS_Store
-.vscode/*
-!.vscode/extensions.json
 
 # API 키는 코드/레포에 절대 두지 않는다. 키는 브라우저 localStorage(codex_api_key)에만 저장된다.
-# .env 는 사용하지 않는다.
 .env
 .env.*
+
+# 로컬 도구 설정
+.claude/settings.local.json
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+
+# 디자인 화면 중복본 — _판단트리디자인/ 과 8개 파일 해시가 전부 동일해서 제외
+채굴 데모 디자인 화면_판단트리/
+
+# 위 폴더를 그대로 압축한 아카이브 (976KB)
+*.zip

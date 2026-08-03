@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# API 키는 코드/레포에 절대 두지 않는다. 키는 브라우저 localStorage(codex_api_key)에만 저장된다.
+# .env 는 사용하지 않는다.
+.env
+.env.*
